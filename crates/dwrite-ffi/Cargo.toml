@@ -1,0 +1,31 @@
+[package]
+name = "dwrite-ffi"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[lib]
+# `dwrite` so the shared library is `dwrite.dll` (Windows) etc. `rlib` too so our `d2d1.dll`
+# (d2d-ffi) can import the private `ITextInterop` it QIs on our text objects, and the in-process
+# test can drive the same objects.
+name = "dwrite"
+# `staticlib` for the `libdwrite.a` the .NET browser-wasm (emscripten) relink in paint.rs needs.
+crate-type = ["cdylib", "rlib", "staticlib"]
+
+[dependencies]
+d2d = { path = "../d2d" }
+d2d-types = { path = "../d2d-types" }
+# Font table parsing only (upem / cmap / design advances / family name / weight+style), exactly as
+# the core text path parses fonts; DirectWrite behaviour is reproduced in `d2d::text`, not skrifa.
+skrifa = { version = "=0.47.0", default-features = false, features = ["std"] }
+# `windows`/`windows_core` resolve to the shim crates (real crates on Windows, windows-bindgen output
+# elsewhere), so the one COM implementation in `win/*` compiles anywhere. See d2d-ffi.
+windows = { package = "windows-shim", path = "../windows-shim" }
+windows_core = { package = "windows-core-shim", path = "../windows-core-shim" }
+
+windows-numerics = "0.3.1"
+# WOFF container unpack (`IDWriteFactory5::UnpackFontFile`): per-table zlib inflate (WOFF 1.0) and
+# the raw-brotli stream of a WOFF2 container (decompress only).
+flate2 = "1"
+brotli-decompressor = "5"

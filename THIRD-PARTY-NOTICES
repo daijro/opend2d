@@ -1,0 +1,172 @@
+THIRD-PARTY NOTICES
+===================
+
+OpenD2D is licensed under GPL-3.0-or-later (see LICENSE). Portions of it were
+ported or adapted from the permissively-licensed third-party projects listed
+below. Their original copyright notices and licence texts are reproduced here as
+those licences require. MIT and BSD-3-Clause are compatible with the GPL; where a
+component is offered as "MIT OR Apache-2.0" we take it under MIT (Apache-2.0 is in
+any case compatible with GPLv3).
+
+This file covers source that was *ported* into this repository. Ordinary Cargo
+dependencies (rustybuzz, skrifa, ttf-parser, unicode-bidi, wgpu, bytemuck, …) are
+fetched by Cargo and carry their own licences in their own crates; they are not
+reproduced here.
+
+================================================================================
+1. dotnet/wpf — WpfGfx (MIL: Media Integration Layer)
+   https://github.com/dotnet/wpf
+   Licence: MIT
+   Copyright (c) .NET Foundation and Contributors
+
+   Ported/adapted algorithms (reverse-engineered against d2d1.dll, which shares
+   the MIL geometry code, and cross-checked against the open WpfGfx source):
+     * crates/d2d/src/geometry/fill_tess.rs   — CScanner sweep + CTessellator band
+       triangulation (WpfGfx/core/geometry/scanner.cpp, tessellate.cpp)
+     * crates/d2d/src/geometry/aatess.rs      — CAATessellator single-sweep AA
+       tessellation (same scanner.cpp / tessellate.cpp, no-intersection path)
+     * crates/d2d/src/geometry/stroke.rs      — CWidener / CSimplePen stroke widener
+       (WpfGfx/core/geometry/strokefigure.{cpp,h}, cpen.cpp)
+     * crates/d2d/src/geometry/dash.rs        — CDasher (strokefigure.{cpp,h})
+     * crates/d2d/src/geometry/milbezier.rs   — HFD Bézier "cracker" (bezier.{h,cpp})
+     * crates/d2d/src/pixels/copy_tess.rs     — CHwRasterizer trapezoid-fringe AA
+       (the opaque COPY-blend fill path)
+     * crates/d2d/src/geometry/combine/{scanner,sweep,intersect,exact}.rs —
+       CScanner region scan (chain building, sweep, junctions, robust segment
+       intersection) and its reconstructor, ported for Outline/Combine/Compare
+       figure structure (WpfGfx/core/geometry/scanner.{cpp,h},
+       LineSegmentIntersection.{cpp,h}, ExactArithmetic.{cpp,h},
+       IntervalArithmetic.h, Boolean.{cpp,h}; WpfGfx/common/shared/heap.h),
+       checked against d2d1.dll
+   (The rest of crates/d2d/src/geometry/combine/ implements the same MIL
+   combine/scanline algorithm but was reconstructed from the d2d1.dll binary, not
+   copied from WpfGfx source; it is noted here for completeness.)
+
+   --- MIT License ---
+   Copyright (c) .NET Foundation and Contributors
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+================================================================================
+2. microsoft/terminal
+   https://github.com/microsoft/terminal
+   Licence: MIT
+   Copyright (c) Microsoft Corporation
+
+   Ported/adapted:
+     * crates/d2d/src/text/blend/mod.rs — the text AA / enhanced-contrast coverage
+       lookup (atlas engine TextLookupTableAtlas::FillRows, gammaIncorrectTargetRatios),
+       from src/renderer/atlas/dwrite.cpp.
+
+   --- MIT License ---
+   Copyright (c) Microsoft Corporation
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+================================================================================
+3. microsoft/windows-rs (windows / windows-core / windows-bindgen)
+   https://github.com/microsoft/windows-rs
+   Licence: MIT OR Apache-2.0 (taken here under MIT)
+   Copyright (c) Microsoft Corporation
+
+   The off-Windows build provides the Win32/COM types and traits itself rather
+   than depending on the `windows` crates. These shims are ABI-identical to, and
+   their generated bindings are windows-bindgen output derived from, windows-rs:
+     * crates/windows-shim/        — windows-bindgen output (src/bindings.rs) plus
+       the glue to use it over the shim core off Windows
+     * crates/windows-core-shim/   — windows-core / windows-strings equivalents
+       (HRESULT, interface/newtype ABI, handle traits)
+
+   --- MIT License ---
+   Copyright (c) Microsoft Corporation
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+================================================================================
+4. jpegxr-pure-rs (vendored) — translated from JXRLib
+   https://github.com/henriksson-lab/jpegxr-pure-rs  (upstream of the vendored copy)
+   Vendored at: crates/vendor/jpegxr-pure-rs/ (see its LICENSE.md and README.md)
+   Licence: BSD-3-Clause
+   Copyright (c) 2009, Microsoft  (JXRLib, the JPEG XR reference implementation)
+
+   Drives OpenD2D's WIC JPEG-XR encoder. The crate's own LICENSE.md governs it and
+   is retained in-tree; its text:
+
+   --- New BSD License (BSD-3-Clause) ---
+   Copyright (c) 2009, Microsoft
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+   ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+================================================================================
+Note: Microsoft Direct2D / DirectWrite / WIC themselves are NOT included or
+redistributed here. OpenD2D is a clean reimplementation; references to d2d1.dll /
+dwrite.dll behaviour in the source are observations used to reproduce behaviour,
+not copied code, and no Microsoft binaries, fonts, or captured reference data are
+part of this source tree (see the publication audit).

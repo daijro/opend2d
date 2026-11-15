@@ -1,0 +1,50 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>opend2d conformance</title>
+<style>
+  :root { color-scheme: light dark; --fg: #111; --bg: #fff; --muted: #666; --ok: #0a7a2f; --bad: #c62828; --card: #f4f4f5; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #e6e6e6; --bg: #141416; --muted: #9a9a9a; --ok: #4ade80; --bad: #f87171; --card: #1e1e22; } }
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 24px; max-width: 900px; color: var(--fg); background: var(--bg); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { color: var(--muted); margin: 0 0 20px; }
+  .counts { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .counts div { background: var(--card); border-radius: 8px; padding: 10px 16px; min-width: 70px; }
+  .counts b { display: block; font-size: 24px; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  code { font-family: ui-monospace, monospace; }
+  pre { background: var(--card); border-radius: 8px; padding: 12px; overflow: auto; white-space: pre-wrap; }
+  #status { font-weight: 600; }
+</style>
+
+<h1>opend2d conformance suite</h1>
+<p class="sub">The same oracle corpus and driver as the native tests, compiled to wasm32 and run here in your browser.</p>
+<p id="status">Running…</p>
+<div class="counts" id="counts" hidden>
+  <div><b class="ok" id="n-pass">–</b>pass</div>
+  <div><b id="n-skip">–</b>skip</div>
+  <div><b class="bad" id="n-fail">–</b>fail</div>
+</div>
+<p id="digest" class="sub"></p>
+<pre id="fails" hidden></pre>
+
+<script type="module">
+  import init, { run } from './pkg/d2d_web.js';
+  const $ = id => document.getElementById(id);
+  try {
+    await init();
+    const r = JSON.parse(run());
+    $('n-pass').textContent = r.pass;
+    $('n-skip').textContent = r.skip;
+    $('n-fail').textContent = r.fail;
+    $('counts').hidden = false;
+    $('digest').innerHTML = 'full-output digest <code>' + r.digest + '</code> — matches native when identical';
+    const regressed = r.regressed.length;
+    $('status').innerHTML = regressed
+      ? '<span class="bad">REGRESSION: ' + regressed + ' byte-exact scene(s) no longer pass</span>'
+      : '<span class="ok">No regression — every byte-exact scene still matches the oracle.</span>';
+    if (r.fails.length) { $('fails').hidden = false; $('fails').textContent = r.fails.join('\n'); }
+  } catch (e) {
+    $('status').innerHTML = '<span class="bad">Failed to run: ' + e + '</span>';
+  }
+</script>

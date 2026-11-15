@@ -1,0 +1,137 @@
+# Phase 4A cross-platform release gate. Every job runs the *same* conformance suite
+# (crates/d2d/tests/conformance.rs) against the *same* oracle corpus. Two gates:
+#   1. each job's `cargo test` fails if any byte-exact scene (conformance/passing.txt) regresses;
+#   2. the final `parity` job asserts the full-output digest is identical on every platform —
+#      i.e. the CPU renderer produced bit-identical pixels everywhere (no float/FMA/libm drift).
+name: conformance
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Matches the wasm-bindgen version pinned in Cargo.lock.
+  WASM_BINDGEN_VERSION: "0.2.128"
+
+# Pull the "output digest 0x…" line the suite prints, for the parity gate.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.run.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - id: run
+        run: |
+          cargo test -p d2d --test conformance -- --nocapture | tee out.txt
+          echo "digest=$(sed -n 's/.*output digest \(0x[0-9a-f]*\).*/\1/p' out.txt)" >> "$GITHUB_OUTPUT"
+
+  wasm:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@${{ env.WASM_BINDGEN_VERSION }}
+      - uses: browser-actions/setup-chrome@v1
+        with:
+          install-chromedriver: true
+      - name: Regression gate under Node and headless Chrome
+        run: |
+          scripts/conformance.sh wasm
+          scripts/conformance.sh wasm-browser
+      - id: digest
+        name: Full-output digest (wasm)
+        run: |
+          cargo build --manifest-path web/Cargo.toml --target wasm32-unknown-unknown --release
+          wasm-bindgen --target nodejs --out-dir pkg-node web/target/wasm32-unknown-unknown/release/d2d_web.wasm
+          d=$(node -e 'process.stdout.write(JSON.parse(require("./pkg-node/d2d_web.js").run()).digest)')
+          echo "digest=$d" >> "$GITHUB_OUTPUT"
+
+  aarch64:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.run.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: aarch64-unknown-linux-gnu
+      - id: run
+        run: |
+          cargo test -p d2d --test conformance -- --nocapture | tee out.txt
+          echo "digest=$(sed -n 's/.*output digest \(0x[0-9a-f]*\).*/\1/p' out.txt)" >> "$GITHUB_OUTPUT"
+
+  windows:
+    runs-on: windows-latest
+    outputs:
+      digest: ${{ steps.run.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - id: run
+        run: |
+          cargo test -p d2d --test conformance -- --nocapture | tee out.txt
+          echo "digest=$(sed -n 's/.*output digest \(0x[0-9a-f]*\).*/\1/p' out.txt)" >> "$GITHUB_OUTPUT"
+
+  macos:
+    runs-on: macos-latest
+    outputs:
+      digest: ${{ steps.run.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - id: run
+        run: |
+          cargo test -p d2d --test conformance -- --nocapture | tee out.txt
+          echo "digest=$(sed -n 's/.*output digest \(0x[0-9a-f]*\).*/\1/p' out.txt)" >> "$GITHUB_OUTPUT"
+
+  freebsd:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          prepare: pkg install -y rust
+          # The workspace is shared with the host; tee the output there for the host to read.
+          run: cargo test -p d2d --test conformance -- --nocapture | tee out.txt
+      - id: digest
+        run: echo "digest=$(sed -n 's/.*output digest \(0x[0-9a-f]*\).*/\1/p' out.txt)" >> "$GITHUB_OUTPUT"
+
+  parity:
+    needs: [linux, wasm, aarch64, windows, macos, freebsd]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All platforms must produce bit-identical output
+        run: |
+          ref='${{ needs.linux.outputs.digest }}'
+          echo "reference (linux): $ref"
+          fail=0
+          for p in wasm aarch64 windows macos freebsd; do
+            case $p in
+              wasm) d='${{ needs.wasm.outputs.digest }}';;
+              aarch64) d='${{ needs.aarch64.outputs.digest }}';;
+              windows) d='${{ needs.windows.outputs.digest }}';;
+              macos) d='${{ needs.macos.outputs.digest }}';;
+              freebsd) d='${{ needs.freebsd.outputs.digest }}';;
+            esac
+            echo "$p: $d"
+            [ -n "$ref" ] && [ "$d" = "$ref" ] || { echo "  ^ DIFFERS"; fail=1; }
+          done
+          [ $fail -eq 0 ] && echo "PARITY OK: identical on every platform"
+          exit $fail

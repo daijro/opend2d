@@ -1,0 +1,20 @@
+# Regenerates crates/d2d-types/src/{abi,inventory}.rs from the pinned windows 0.62.2 source.
+# Not a workspace member (see root Cargo.toml `exclude`). See crates/d2d-types/README.md.
+[package]
+name = "d2d-types-gen"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[[bin]]
+name = "gen"
+path = "src/main.rs"
+
+[dependencies]
+syn = { version = "2", features = ["full", "visit-mut", "visit", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"
+prettyplease = "0.2"
+
+[workspace]

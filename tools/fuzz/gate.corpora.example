@@ -1,0 +1,16 @@
+# Corpus list for gate.sh — copy to gate.corpora and edit. One corpus per line:
+#   name:dir:start:count:browser
+#     name     short label for the report column
+#     dir      directory of pinned captures (fz-<seed>.scene.json + native fz-<seed>.bgra/.json);
+#              $VARS are expanded, so a shared root can be factored out (export it before running)
+#     start    first seed
+#     count    number of seeds
+#     browser  1 to emulate the browser adapter/flags for this corpus, empty otherwise
+#
+# gate.corpora itself is private (it points at captures kept out of the repo) and is gitignored.
+# Example, assuming `export FUZZ=/path/to/your/captures` before running gate.sh:
+
+baseline:$FUZZ/baseline/out:0:5000:
+browser-1:$FUZZ/cap/round1:5000:1000:1
+browser-2:$FUZZ/cap/round2:6000:1000:1
+latest:$FUZZ/cap/latest:25000:1000:

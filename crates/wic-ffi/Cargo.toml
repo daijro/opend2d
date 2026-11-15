@@ -1,0 +1,21 @@
+[package]
+name = "wic-ffi"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[lib]
+# `windowscodecs` so the shared library is `windowscodecs.dll` (Windows): a true drop-in replacement.
+# `rlib` too so our `d2d1.dll` (d2d-ffi) and the in-process test can share the same WIC objects.
+name = "windowscodecs"
+# `staticlib` for the `libwindowscodecs.a` the .NET browser-wasm (emscripten) relink in paint.rs needs.
+crate-type = ["cdylib", "rlib", "staticlib"]
+
+[dependencies]
+d2d = { path = "../d2d" }
+roxmltree = "0.20.0"
+# `windows`/`windows_core` resolve to the shim crates (real crates on Windows, windows-bindgen output
+# elsewhere), so the one COM implementation in `win/*` compiles anywhere. See d2d-ffi.
+windows = { package = "windows-shim", path = "../windows-shim" }
+windows_core = { package = "windows-core-shim", path = "../windows-core-shim" }

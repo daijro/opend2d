@@ -1,0 +1,10 @@
+# Native captures, pinned corpora and local config never go in the repo — only the tooling does.
+gate.corpora
+*.bgra
+*.tar
+fz-*.json
+fz-*.scene.json
+wic-*.json
+wic-*.bin
+*.f0.bin
+__pycache__/
