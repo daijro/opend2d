@@ -3560,6 +3560,7 @@ fn bisect_pixel() {
 // d2d-ref on the VM), drive gen_scene(seed) through our core and compare, exactly as the suite runner
 // does against its oracles. Prints FDIFF <seed>: <first mismatch> per divergence for minimise+bucket.
 // Gated by FUZZ_DIFF_DIR; FUZZ_START/FUZZ_N bound the range.
+#[cfg(not(target_arch = "wasm32"))] // reads fuzz captures from disk; wasm has no filesystem
 #[test]
 fn fuzz_diff() {
     let Some(dir) = std::env::var_os("FUZZ_DIFF_DIR") else { return };
