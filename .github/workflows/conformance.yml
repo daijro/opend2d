@@ -44,11 +44,10 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-bindgen-cli@${{ env.WASM_BINDGEN_VERSION }}
-      - uses: browser-actions/setup-chrome@v1
-        with:
-          install-chromedriver: true
       - name: Regression gate under Node and headless Chrome
         run: |
+          # Use the runner image's own Chrome and the ChromeDriver built for it, so the two always match.
+          export CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver"
           scripts/conformance.sh wasm
           scripts/conformance.sh wasm-browser
       - id: digest
