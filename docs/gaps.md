@@ -94,10 +94,10 @@ E_NOTIMPL for them.
 
 ## The Linux, macOS and FreeBSD libraries
 
-Outside Windows, libd2d1 currently covers the basic path: create a factory, a device context and a
-target bitmap, fill geometry with a solid brush, and read the result back.
-`crates/d2d-ffi/portable-test.c` tests it. Text, effects and saving images through WIC currently go
-through the Windows DLLs under Wine. On Windows and under Wine the whole COM API is available.
+OpenD2D builds the same COM implementation for every platform. On Linux, macOS and FreeBSD,
+libd2d1, libdwrite and libwindowscodecs offer the same interfaces as the Windows DLLs, including
+text, effects and WIC, and nothing from Microsoft is needed. The only methods missing there are the
+ones that need a window, a GDI device context, a DXGI surface or a printer, listed above.
 
 ## Platform builds
 

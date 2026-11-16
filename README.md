@@ -28,9 +28,8 @@ browser.
 - Missing methods: CreateSharedBitmap, CreateCompatibleRenderTarget, CreateLayer, CreateMesh,
   GetGradientMeshWorldBounds, CreateSvgGlyphStyle, GetColorBitmapGlyphImage, GetSvgGlyphImage,
   GetRegisteredEffects, GetEffectProperties and ID2D1PathGeometry::Stream.
-- Off Windows: OpenD2D's own Linux, macOS and FreeBSD libraries can draw geometry with solid brushes
-  and read the result back. Text, effects and WIC saving currently go through the Windows DLLs under
-  Wine.
+- Off Windows: the Linux, macOS and FreeBSD libraries have the same COM API as the Windows DLLs,
+  except for methods that need a window, a GDI device context, DXGI or a printer.
 - Partly implemented: GDI metafile playback covers only basic records, printing produces whole-page
   raster output, DXGI surfaces are single-plane BGRA (no multi-plane YUV), and Widen does not match
   yet for round joins, round caps or square caps.
