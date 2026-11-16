@@ -9,9 +9,14 @@ scenes, and renders each one twice: once with the Windows system libraries on a 
 and once with the OpenD2D build under Wine. It then reports every difference in pixels, in the
 per-operation HRESULT and tag channel, and in query results.
 
-Nothing here contains captured reference data. You supply a Windows reference machine and the
-tooling drives it. The Windows captures, pinned corpora and private test suite stay out of the
-repository (see [What is not in the repo](#what-is-not-in-the-repo)).
+Nothing here contains captured reference data. The Windows captures, pinned corpora and private
+test suite stay out of the repository (see [What is not in the repo](#what-is-not-in-the-repo)).
+So does the bridge that drives the Windows reference machine (`harness/vm.py`) and the end-to-end
+runner built on it. The scripts here that talk to Windows (`capture.py`, `prefix_bisect.py` and
+`wic/wic_cap.py`) import that bridge, so they do not run from a public clone. To capture Direct2D's
+output yourself, build the harness's reference renderer `d2d-ref.exe` and run it on a Windows
+machine (see [Capturing on Windows](#capturing-on-windows)). The generator, the differ, the gate
+and the triage scripts work without the private files.
 
 ## Layout
 
@@ -21,29 +26,26 @@ harness. This directory holds the orchestration around them.
 | Piece | Where | What it does |
 |-------|-------|--------------|
 | Scene generator | `harness/src/bin/fuzz-gen.rs` | emits seeded random scenes and validates each one |
-| End-to-end fuzzer | `harness/fuzz.py` | generates scenes, captures both sides, diffs, minimises and buckets by area |
-| Reference-machine I/O | `harness/vm.py` | push, run and pull over JSON-RPC to the reference machine |
+| Reference renderer | `harness/src/bin/d2d-ref.rs` | draws one scene with Windows' Direct2D and writes its pixels and results |
 | Regression differ | `crates/d2d/tests/conformance.rs` (`fuzz_diff`) | compares OpenD2D with pinned Windows captures |
 | Op attribution | the same file (`fuzz_attr`), plus `prefix_bisect.py` | finds which op first paints a mismatching pixel |
 | WIC differ | `crates/d2d/tests/wic_fuzz.rs`, `wic/` | the same idea for the imaging codec layer |
-| `vmcap.py` | here | shared Windows capture driver (per-run directory, cold fonts, chunked rendering) |
-| `capture.py` | here | captures Windows output for a scene directory, warm or cold |
-| `prefix_bisect.py` | here | prefix-bisects a mismatching pixel on Windows |
+| `vmcap.py` | here | shared Windows capture driver (per-run directory, cold fonts, chunked rendering); needs the private bridge |
+| `capture.py` | here | captures Windows output for a scene directory, warm or cold; needs the private bridge |
+| `prefix_bisect.py` | here | prefix-bisects a mismatching pixel on Windows; needs the private bridge |
 | `gate.sh` | here | no-regression A/B run across every corpus, for the merge gate |
 | `dump_scene.py` | here | prints a scene's ops with painter-op indexing |
 | `route.py` | here | buckets attribution output by subsystem for triage |
 
 ## Prerequisites
 
-- A Windows reference machine reachable over HTTP, running the small JSON-RPC bridge that
-  `harness/vm.py` talks to (push, run and pull). Point the tooling at it with `D2D_VM_URL`.
-- Wine, to run the OpenD2D build on the Linux host.
-- The harness renderers built for Windows (`d2d-ref.exe` and `wic-dump.exe`), and the OpenD2D
-  drop-in build staged for Wine. `harness/fuzz-setup.sh` builds and stages them and lists the exact
-  targets.
+- A Windows machine, to capture Direct2D's output with `d2d-ref.exe`.
+- An x86_64-pc-windows-gnu Rust toolchain to build it:
+  `cargo build --release --manifest-path harness/Cargo.toml --target x86_64-pc-windows-gnu --bin d2d-ref`.
 - Python 3, plus Pillow for the WIC generator.
 
-These environment variables are shared by the tools (defaults in parentheses):
+`vmcap.py` and the scripts built on it also read these variables (defaults in parentheses). They
+only matter with the private bridge:
 
 | Variable | Meaning |
 |----------|---------|
@@ -52,19 +54,23 @@ These environment variables are shared by the tools (defaults in parentheses):
 | `D2D_ROOT` | repository root (detected from the script location) |
 | `VM_CAP` / `BB_THREAD_ID` | names a per-run working directory so parallel runs do not collide |
 | `D2D_VM_FONTS` | source directory of the measured faces (`C:\Windows\Fonts`) |
-| `STAGE` | directory holding the staged OpenD2D build for Wine (used by `harness/fuzz.py`) |
+
+## Capturing on Windows
+
+`d2d-ref.exe SCENE.json OUTPUT.png` draws one scene with the system's Direct2D on WARP. Run it from
+a directory with no OpenD2D DLL beside it, so Windows loads its own libraries. It writes the image,
+plus the raw pixels and the result codes next to it with the same stem (`.bgra` and `.json`). Copy
+the generated scenes to the Windows machine, run each one, and copy the `.bgra` and `.json` files
+back into a capture directory named `fz-<seed>.bgra` and `fz-<seed>.json`, with the input scene
+beside them as `fz-<seed>.scene.json`. That is the layout `capture.py` writes and `fuzz_diff` reads.
 
 ## Workflows
 
 ### 1. Discover new divergences
 
-```sh
-STAGE=/path/to/staged-build COUNT=1000 SEED=12345 python3 harness/fuzz.py
-```
-
-This generates `COUNT` scenes from `SEED` and captures both sides. For every mismatch it writes a
-minimised repro, grouped by area (text, sampling, effects, raster and so on). If the Windows side
-produced output for none of the scenes, the run fails loudly instead of reporting 0 mismatches.
+The end-to-end discovery runner, which generates scenes, captures both sides, minimises and buckets
+each mismatch, is private. Without it, generate a fresh corpus, capture it on Windows and run the
+differ, as below.
 
 ### 2. Pin a corpus and run the regression differ
 
@@ -73,14 +79,15 @@ Windows captures, so its results are reproducible. Generate a corpus, capture th
 once, then diff as often as you like:
 
 ```sh
-cargo run -q -p harness --bin fuzz-gen -- scenes/ 1000 25000      # scenes/fz-<seed>.json
-python3 tools/fuzz/capture.py scenes/ captures/round-x            # add --cold for text
+cargo run -q --manifest-path harness/Cargo.toml --bin fuzz-gen -- scenes/ 1000 25000   # scenes/fz-<seed>.json
+python3 tools/fuzz/capture.py scenes/ captures/round-x            # private bridge; add --cold for text
 cargo test -p d2d --test conformance --release fuzz_diff -- --nocapture   # with the env below
 ```
 
 `capture.py` renders each scene through the system libraries and writes the Windows output as
 `fz-<seed>.bgra` and `fz-<seed>.json`, with the exact input pinned beside it as
-`fz-<seed>.scene.json`.
+`fz-<seed>.scene.json`. It needs the private bridge; without it, capture with `d2d-ref.exe` as
+described in [Capturing on Windows](#capturing-on-windows).
 
 `--cold` captures first-time text rasterization, which is what text conformance targets. It renders
 from a custom font collection that holds only the measured faces, and records those faces in
@@ -93,7 +100,7 @@ The `fuzz_diff` test reads its inputs from the environment:
 |----------|---------|
 | `FUZZ_DIFF_DIR` | the capture directory |
 | `FUZZ_START`, `FUZZ_N` | first seed and count |
-| `FUZZ_BROWSER` | `1` to emulate the browser adapter and flags |
+| `FUZZ_BROWSER` | if set, generate browser-style scenes (realistic values, only the ops a browser canvas uses); the differ only uses it when a capture has no pinned `.scene.json` and the scene has to be regenerated. `fuzz-gen` reads it too |
 
 It prints `FDIFF <seed>: …` for each divergence, and `FDIFF-SKIP <seed>` for inputs Windows could
 not render, which cannot be compared.
@@ -103,7 +110,7 @@ not render, which cannot be compared.
 `fuzz_attr` is in the same test binary. Set `FUZZ_ATTR=1` together with the `FUZZ_DIFF_DIR`,
 `FUZZ_START` and `FUZZ_N` variables above, and it reports which OpenD2D op painted each
 mismatching pixel. To find the op that painted it on Windows, and so the subsystem OpenD2D fails to
-match, bisect the pinned scene on the reference machine:
+match, bisect the pinned scene on the reference machine (this needs the private bridge):
 
 ```sh
 python3 tools/fuzz/prefix_bisect.py captures/round-x 25098:0:0 25757:4:12   # <seed>:<px>:<py> …
@@ -132,7 +139,10 @@ reported but not gated.
 
 ### 5. WIC (imaging codecs)
 
-The imaging layer has its own generator, capture and diff tools that mirror the ones above:
+The imaging layer has its own generator, capture and diff tools that mirror the ones above. The
+capture and A/B steps run `wic-dump.exe`, a harness program that is not in this repository, and
+`wic_cap.py` also needs the private bridge. Only `wic_gen.py` and the in-process `wic_fuzz.rs` loop
+work from a public clone:
 
 ```sh
 python3 tools/fuzz/wic/wic_gen.py corpus/ 1000 0                      # needs Pillow

@@ -18,8 +18,9 @@ It implements 23 WIC interfaces, plus the IClassFactory and enumerator plumbing.
 factory, decoder and frame decode, encoder and frame encode, format converter, palette, scaler,
 clipper, flip-rotator, stream, colour context, metadata, and pixel format and codec info.
 
-Off Windows, the WIC definitions are gated behind `cfg(windows)`, so the library only exposes
-DllGetClassObject and DllCanUnloadNow, both returning E_NOTIMPL.
+The same COM implementation is built for every platform. Off Windows it uses the `windows-shim` and
+`windows-core-shim` crates for the interface definitions, so libwindowscodecs on Linux, macOS and
+FreeBSD has the same WIC API as windowscodecs.dll and needs nothing from Microsoft.
 
 ## Deployment
 

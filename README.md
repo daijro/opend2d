@@ -11,8 +11,8 @@ browser.
 > [!WARNING]
 > **This is a public demo beta (0.1.0-beta.1). Full parity with Direct2D is not complete yet.**
 > 27 of 6,159 test scenes and about 390 of 20,600 randomly generated scenes still differ from
-> Windows, and some API methods are not implemented yet. Don't rely on it matching Windows in every
-> case.
+> Windows, and a few API methods (such as the effect property name lookups) are not implemented
+> yet. Don't rely on it matching Windows in every case.
 
 <details>
 <summary>Not at parity yet</summary>
@@ -25,9 +25,6 @@ browser.
 - Effects: a few of the 64 built-in effects are not exact on every input, for example LookupTable3D
   with 8-bit tables or with sizes that aren't powers of two.
 - Float targets: reading back a high-precision float (R16 or R32) target is not supported.
-- Missing methods: CreateSharedBitmap, CreateCompatibleRenderTarget, CreateLayer, CreateMesh,
-  GetGradientMeshWorldBounds, CreateSvgGlyphStyle, GetColorBitmapGlyphImage, GetSvgGlyphImage,
-  GetRegisteredEffects, GetEffectProperties and ID2D1PathGeometry::Stream.
 - Off Windows: the Linux, macOS and FreeBSD libraries have the same COM API as the Windows DLLs,
   except for methods that need a window, a GDI device context, DXGI or a printer.
 - Partly implemented: GDI metafile playback covers only basic records, printing produces whole-page
@@ -45,7 +42,7 @@ Every test draws a scene with OpenD2D and compares the result, byte for byte, wi
 10.0.26100.8875 produced for the same scene on Windows 11 (LTSC 26100, WARP). Pixels, return codes
 and query results all have to match. On top of the hand-written test scenes, a fuzzer generates
 random scenes and compares those too. The Windows captures themselves are not in this repository;
-the fuzzer is, in `tools/fuzz` and `harness`. [docs/conformance.md](docs/conformance.md) explains
+the fuzzer's scene generator and differ are, in `tools/fuzz` and `harness`. [docs/conformance.md](docs/conformance.md) explains
 how the checks work.
 
 | | Result |

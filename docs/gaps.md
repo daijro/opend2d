@@ -71,26 +71,13 @@ image sources are single-plane BGRA, without multi-plane YUV. ID2D1Geometry::Wid
 for rectangles and for strokes with flat caps and miter or bevel joins, but not yet for round joins,
 round caps or square caps.
 
-## Methods that are not implemented
-
-Direct2D implements these, and OpenD2D does not yet:
-
-- ID2D1RenderTarget::CreateSharedBitmap, a bitmap that shares a DXGI, WIC or memory handle.
-- ID2D1RenderTarget::CreateCompatibleRenderTarget, an offscreen bitmap render target.
-- ID2D1RenderTarget::CreateLayer, an explicit layer object. Layered drawing still works, because
-  PushLayer's parameters are applied directly; only the layer object is missing.
-- ID2D1RenderTarget::CreateMesh, the mesh object used by FillMesh.
-- ID2D1DeviceContext::GetGradientMeshWorldBounds.
-- CreateSvgGlyphStyle, GetColorBitmapGlyphImage and GetSvgGlyphImage, which return images of color
-  and SVG glyphs (Direct2D 1.3).
-- ID2D1Factory1::GetRegisteredEffects and GetEffectProperties, which list the registered effects.
-- ID2D1PathGeometry::Stream, which replays a stored path into a geometry sink.
+## Methods that need Windows
 
 Some methods need an operating system surface (a window, a DXGI surface, a GDI device context or an
 XPS print job), so they only work on Windows and under Wine: CreateHwndRenderTarget,
 CreateDxgiSurfaceRenderTarget, CreateDCRenderTarget, CreatePrintControl,
-CreateBitmapFromDxgiSurface and CreateImageSourceFromDxgi. The Linux and macOS library returns
-E_NOTIMPL for them.
+CreateBitmapFromDxgiSurface and CreateImageSourceFromDxgi. The Linux, macOS and FreeBSD libraries
+return E_NOTIMPL for them.
 
 ## The Linux, macOS and FreeBSD libraries
 

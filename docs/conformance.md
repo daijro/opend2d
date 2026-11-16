@@ -39,7 +39,9 @@ The examples. `crates/d2d-ffi/examples/run-examples.sh` builds small C, C++ and 
 against the standard API and checks that what each one reads back matches the capture.
 
 The fuzzer. Besides the hand-written scenes, a fuzzer generates random scenes and compares them in
-the same way. 98.1% of about 20,600 such scenes match. The fuzzer is in `tools/fuzz` and `harness`.
+the same way. 98.1% of about 20,600 such scenes match. The scene generator and the differ are in `tools/fuzz`
+and `harness`; capturing new scenes needs a Windows machine (see
+[tools/fuzz/README.md](../tools/fuzz/README.md)).
 
 ## Running the checks
 

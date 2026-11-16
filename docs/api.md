@@ -30,22 +30,12 @@ The methods below return E_NOTIMPL, or a specific HRESULT, either because Direct
 because they serve registration or host data that Direct2D keeps outside the renderer. They are not
 missing work.
 
-- ID2D1Factory::CreateHwndRenderTarget, ID2D1HwndRenderTarget, and swap-chain presentation as a
-  renderer feature. OpenD2D renders offscreen, and presentation is the host's job.
+- Off Windows, the methods that need a window, a DXGI surface, a GDI device context or a printer,
+  such as ID2D1Factory::CreateHwndRenderTarget, return E_NOTIMPL. On Windows they work.
 - The property metadata getters for built-in effects: ID2D1Properties::GetPropertyName,
   GetPropertyCount, GetType and GetSubProperties. Effect property names, types and counts live in
   the registration XML inside d2d1.dll, not in the renderer. GetValue and GetValueSize do read the
   stored value back.
-- The versioned factory overload ID2D1Factory1::CreateDrawingStateBlock (which returns
-  ID2D1DrawingStateBlock1), plus GetRegisteredEffects and GetEffectProperties. Create drawing state
-  blocks through the base ID2D1Factory method instead. ID2D1Factory1::CreatePathGeometry is
-  implemented: it returns an ID2D1PathGeometry1 whose ComputePointAndSegmentAtLength matches
-  Direct2D byte for byte for line, cubic and quadratic figures.
-- The legacy render-target creators ID2D1RenderTarget::CreateSharedBitmap,
-  CreateCompatibleRenderTarget, CreateLayer, CreateMesh and CreateWicBitmapRenderTarget. The
-  device-context path supersedes them.
-- Colour bitmap and SVG glyph image extraction: ID2D1DeviceContext4::CreateSvgGlyphStyle,
-  GetColorBitmapGlyphImage and GetSvgGlyphImage. No passing scene reaches them yet.
 
 ## Implemented, but not at parity yet
 
@@ -67,6 +57,4 @@ The remaining rendering differences, such as fallback fonts for non-Latin script
 and float paths, are described with examples in [gaps.md](gaps.md). The GPU backend (`d2d-wgpu`) and arbitrary shader translation (`d2d-shader`)
 are secondary to the authoritative CPU path and advance incrementally.
 
-The source always has the current lists. In `crates/d2d-ffi/src/win/mod.rs`, `NOT_IMPL` lists the
-Direct2D rejections with the reason for each, and running `grep '#\[implement('` in each FFI crate
-lists the implemented interfaces.
+Running `grep '#\[implement('` in each FFI crate lists the implemented interfaces.
