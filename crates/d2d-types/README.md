@@ -1,29 +1,32 @@
 # d2d-types
 
-Portable (native + `wasm32-unknown-unknown`) Direct2D / DirectWrite / WIC / DXGI value types,
-enums, constants, GUIDs/CLSIDs, a public-interface inventory (method order, slots, IIDs), and the
-frozen cross-crate contracts (phase 0A).
+Portable Direct2D, DirectWrite, WIC and DXGI types that build both for native targets and for
+`wasm32-unknown-unknown`. The crate holds the value types, enums, constants, GUIDs and CLSIDs, an
+inventory of the public interfaces (method order, vtable slots and IIDs), and the frozen contracts
+shared between crates.
 
-## What is generated vs hand-written
+## Generated and hand-written files
 
 | File | Lines | Source |
 | --- | ---: | --- |
-| `src/abi.rs` | ~9.2k | **generated** — value types, enums, constants, GUIDs/CLSIDs |
-| `src/interfaces.rs` | ~10.1k | **generated** — 310 interfaces, 1458 methods, IIDs, slots |
-| `src/lib.rs` | ~130 | hand-written — inventory types + portable `prelude` |
-| `src/contracts.rs` | ~90 | hand-written — the 7 frozen contracts |
-| `gen/src/main.rs` | ~260 | hand-written — the generator |
-| `tests/inventory.rs` | ~110 | hand-written — tests (incl. `#[cfg(windows)]` parity) |
+| `src/abi.rs` | ~9.2k | generated: value types, enums, constants, GUIDs and CLSIDs |
+| `src/interfaces.rs` | ~10.1k | generated: 310 interfaces, 1458 methods, IIDs and slots |
+| `src/lib.rs` | ~130 | hand-written: inventory types and the portable `prelude` |
+| `src/contracts.rs` | ~90 | hand-written: the 7 frozen contracts |
+| `gen/src/main.rs` | ~260 | hand-written: the generator |
+| `tests/inventory.rs` | ~110 | hand-written: tests, including the `#[cfg(windows)]` parity checks |
 
-The two generated files are `@generated` — **do not edit them by hand**; change `gen/` and rerun.
+The two generated files are marked `@generated`. Do not edit them by hand; change `gen/` and run it
+again.
 
 ## Regenerating
 
-Pinned input: the `windows` crate **0.62.2** source (MIT OR Apache-2.0), as resolved in `Cargo.lock`
-and unpacked under the Cargo registry. No `Windows.Win32.winmd` / `windows-bindgen` is available
-locally, so the generator transforms that source (the sanctioned fallback): it strips the COM/link
-machinery, flattens the four namespaces into one `abi` module, lowers COM-interface-typed fields to
-a pointer-sized `prelude::ComPtr`, and reads the interface inventory from the `define_interface!`,
+The input is pinned to the source of the `windows` crate, version 0.62.2 (MIT OR Apache-2.0), as
+resolved in `Cargo.lock` and unpacked in the Cargo registry. Neither `Windows.Win32.winmd` nor
+`windows-bindgen` is available locally, so the generator transforms that source instead, which is
+the sanctioned fallback. It strips the COM and link machinery, flattens the four namespaces into a
+single `abi` module, and lowers fields typed as COM interfaces to a pointer-sized
+`prelude::ComPtr`. It reads the interface inventory from the `define_interface!`,
 `interface_hierarchy!` and `*_Vtbl` declarations.
 
 ```sh
@@ -35,18 +38,20 @@ cargo run --offline -- \
   ../src
 ```
 
-The generator asserts it found exactly 310 interfaces and 1458 methods, and reports any value type
-it skips (0 for windows 0.62.2). `gen/` is excluded from the workspace (see the root `Cargo.toml`).
+The generator asserts that it found exactly 310 interfaces and 1458 methods, and it reports any
+value type it skips (none for windows 0.62.2). `gen/` is excluded from the workspace (see the root
+`Cargo.toml`).
 
 ## Tests
 
-- `cargo test -p d2d-types` (native) and `cargo build -p d2d-types --target wasm32-unknown-unknown`:
-  inventory structure/slot invariants and representative portable layouts.
-- `cargo test -p d2d-types --target x86_64-pc-windows-gnu` (run under Wine): the `windows_parity`
-  module proves sampled sizes, alignments, enum values, GUIDs, IIDs and vtable slot counts match the
-  `windows` crate itself.
+- `cargo test -p d2d-types` (native) and `cargo build -p d2d-types --target wasm32-unknown-unknown`
+  check the inventory's structure and slot invariants and a representative set of portable layouts.
+- `cargo test -p d2d-types --target x86_64-pc-windows-gnu`, run under Wine, runs the
+  `windows_parity` module. It checks that sampled sizes, alignments, enum values, GUIDs, IIDs and
+  vtable slot counts match the `windows` crate itself.
 
 ## License
 
-Generated declarations are derived from the `windows` crate (Microsoft), MIT OR Apache-2.0. The MIT
-notice is retained; see <https://github.com/microsoft/windows-rs>. No `ref/` content is used.
+The generated declarations are derived from Microsoft's `windows` crate, which is MIT OR
+Apache-2.0. The MIT notice is retained; see <https://github.com/microsoft/windows-rs>. No `ref/`
+content is used.

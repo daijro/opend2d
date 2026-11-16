@@ -1,52 +1,57 @@
-# Rendering performance
+# Performance
 
-Photo-size, real-use benchmark scenes (full-HD and 4K fills, strokes, gradients, image draws with
-scaling, and effect chains). Every optimisation below is **output-identical** — byte-for-byte across
-the conformance suite, every fuzz corpus and the WIC decoders (the `identity-gate`).
+These benchmarks time OpenD2D drawing photo-size scenes like the ones real applications draw:
+full-HD and 4K fills, gradients, scaled images and effects.
 
-## Reproduce
+All the times are OpenD2D's own. The x86-64 column is OpenD2D compiled to native code; the
+WebAssembly column is the same code compiled to wasm32 with SIMD and run in Node. There is no
+Direct2D column, because Direct2D only runs on Windows and these were measured on Linux.
 
-One build of each target, then the minimum wall time over `REPS` renders of each photo-size scene,
-native and wasm back-to-back per scene so both see the same machine state. Run on a quiet machine —
-`min` drops slow outliers but cannot hide sustained contention.
+None of the optimisations change the output. Every one is checked against the full test suite, all
+the fuzz scenes and the WIC decoders, which must stay identical byte for byte.
+
+## Results
+
+Each figure is the fastest of 9 runs, in milliseconds. Not every scene has been timed in
+WebAssembly yet.
+
+The figures were measured on commit 060c4791 (2026-11-14). Running the old and the release code side
+by side on two of the scenes gave ratios of 0.975 and 1.062, which is within measurement noise, so
+they also hold for this release.
+
+| Scene (size) | OpenD2D, x86-64 (ms) | OpenD2D, WebAssembly (ms) |
+| --- | ---: | ---: |
+| Image scaled up (1920×1080) | 582 | 1371 |
+| Fill (3840×2160) | 51 | 129 |
+| Fill (1920×1080) | 10 | not measured |
+| Linear gradient (3840×2160) | 359 | 711 |
+| Radial gradient (3840×2160) | 364 | not measured |
+| Linear gradient (1920×1080) | 90 | not measured |
+| Radial gradient (1920×1080) | 88 | not measured |
+| Blur (3840×2160) | 283 | not measured |
+| Blur (1920×1080) | 273 | not measured |
+| Color adjustment (1920×1080) | 51 | not measured |
+
+## Reproducing
 
 ```sh
 REPS=9 scripts/perf-bench.sh      # writes the scenes, builds both targets, prints the table below
 ```
 
-The wasm build is `simd128` only — never `relaxed-simd` or FMA contraction (determinism: the web and
-native targets must produce identical pixels).
+The script builds each target once, then times each scene `REPS` times and keeps the fastest run.
+The x86-64 and WebAssembly runs of a scene happen back to back, so both see the same machine state.
+Use an otherwise idle machine: keeping the fastest run hides the odd slow run, but not a machine that
+is busy for the whole benchmark.
 
-## Results
+The WebAssembly build uses plain SIMD only, without relaxed SIMD or fused multiply-add, because the
+browser build has to produce exactly the same pixels as every other build.
 
-Minimum wall time in milliseconds over the reps. `native` is x86_64; `wasm` is Node with `simd128`.
-Refresh with `scripts/perf-bench.sh`.
+## What made it fast
 
-These figures were measured on commit `060c4791` (2026-11-14). An interleaved A/B of the same scenes
-against the current release renderer shows no change — per-scene native ratios of 0.975 and 1.062,
-within measurement noise — so they stand for this release.
+Scaling an image up with the high-quality cubic filter now reads each source pixel once and works on
+all four color channels together, instead of reading the pixel again for each channel.
 
-| scene (size)          | native (ms) | wasm (ms) |
-|-----------------------|------------:|----------:|
-| image-up (1920×1080)  |         582 |      1371 |
-| fill-4k (3840×2160)   |          51 |       129 |
-| fill-1080 (1920×1080) |          10 |         — |
-| gradient-linear-4k    |         359 |       711 |
-| gradient-radial-4k    |         364 |         — |
-| gradient-linear-1080  |          90 |         — |
-| gradient-radial-1080  |          88 |         — |
-| blur-4k               |         283 |         — |
-| blur-1080             |         273 |         — |
-| coloradjust-1080      |          51 |         — |
-
-## Techniques
-
-- **HQ-cubic window combine fetches each texel once across the four channels** — the cubic-magnify
-  `DrawBitmap` sampler runs the identical per-channel math across the four BGRA lanes from a single
-  texel fetch rather than re-reading each texel per channel. This carries image magnification.
-- **Full-coverage opaque source-over writes the source directly** — a UNORM8 solid/path/stroke fill
-  skips the destination read and the per-pixel float blend when the result is provably the source,
-  which carries the solid-fill interiors; a test proves it for every input it fires on.
-- **Opaque source-over brush pixel writes the rounded source directly** — the gradient/bitmap-brush
-  counterpart (gradient brushes realise to a 1-row ramp and fill through this path), proved against the
-  general formula by test.
+When a solid, path or stroke fill is fully opaque and fully covers a pixel, the result is just the
+fill color, so OpenD2D writes it directly instead of reading the destination and blending. A test
+proves this gives the same result as the full blend for every case it applies to. Opaque gradient
+and bitmap brushes take the same shortcut.

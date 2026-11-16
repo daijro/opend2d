@@ -1,64 +1,55 @@
 # How conformance is measured
 
-opend2d's only correctness criterion is **byte-for-byte equality with native `d2d1.dll` on Microsoft
-WARP**. Nothing here is judged by eye or by a tolerance; a scene passes only when every pixel and
-every per-op `HRESULT`/tag/geometry-query result equals the captured native result exactly.
+OpenD2D has one measure of correctness: its output has to be identical, byte for byte, to what
+Direct2D produces on Windows for the same scene. Nothing is judged by eye or within a tolerance. A
+scene passes only when every pixel matches and every result Direct2D reports (the HRESULT of each
+call, the tag recorded with it and the answer to any geometry query) matches too. A difference of
+one in the lowest bit counts as a failure. Float targets are compared by their raw bits.
 
-## The oracle
+## The Windows captures
 
-Native `d2d1.dll` **10.0.26100.8875** (Windows 11 LTSC 26100, SHA-256 verified) renders each scene on
-a **D3D11 WARP** software device (adapter vendor `0x1414`, device `0x008c`, software flag, feature
-level 11_0) and the result is read back before any desktop/display colour management. Two independent
-captures were byte-identical across all artifacts, so the capture is deterministic.
+The reference output comes from Direct2D's d2d1.dll version 10.0.26100.8875 on Windows 11 LTSC
+26100, drawing on the WARP software renderer. Each scene is captured as its raw pixels plus a small
+JSON file with the size, the DPI, the device used and every result code. When Direct2D's EndDraw
+fails, only the JSON file is kept, so error behaviour is tested as well. Two separate capture runs
+gave identical files, so the captures are repeatable.
 
-Each scene produces, in `conformance/oracle/win11-26100/<scene>.{bgra,json}`:
+The captures and the list of passing scenes are kept privately and are not part of this repository.
+The test programs that compare against them are.
 
-- `.bgra` — raw, tightly-packed, top-down target pixels (default premultiplied BGRA8), no header.
-- `.json` — size/DPI, adapter/feature-level provenance, and the recorded per-op `HRESULT` + primitive
-  tags, the `EndDraw` result, and any geometry-query answers. A scene whose native `EndDraw` fails has
-  JSON only (no pixels) so negative/error behaviour is captured too.
+## What is checked
 
-Scenes are authored as `harness/scenes/<name>.json` and captured with `harness/vm.py` against the
-reference VM. The harness (`harness/src/`) is a thin, format-stable driver — the same binary renders
-on the VM (native), under Wine (our DLLs) and on every target (our core), so results are comparable
-by construction.
+The renderer itself. The conformance test draws each scene with the Rust renderer and compares it
+with the capture. A scene that matches is added to the pass list, and the test fails if any listed
+scene stops matching, so the list only grows. Today 6132 of 6159 scenes match. 7 are skipped
+because they use an operation the DeviceContext API doesn't offer, and 20 don't match yet.
 
-## The three levels
+Every platform. The same suite runs on x86-64, as WebAssembly (in Node and in a headless browser),
+on aarch64 under qemu, and as a Windows program under Wine. `scripts/conformance.sh parity` checks
+that every platform the machine can run produces exactly the same output.
 
-1. **Core (CPU)** — `cargo test -p d2d --test conformance` drives the renderer directly against the
-   oracle. `conformance/passing.txt` is the set that is byte-exact; the test fails if any listed
-   scene regresses. It only ever grows. **6132 of 6159 scenes** pass today (7 skip on an op the
-   `DeviceContext` API does not expose, 20 not yet byte-exact). (Refresh: run the command above and
-   read the final `conformance: N pass, N skip, N fail` line.)
+The drop-in DLLs. OpenD2D's d2d1.dll and dwrite.dll are placed next to an unchanged Windows test
+program and driven through the real COM interface under Wine, and the results are compared with the
+captures in the same way. 95 of 95 scenes in that set match Direct2D, and the DLLs produce exactly
+the same output as the Rust renderer on all 88 scenes compared, so the DLL layer adds no
+differences. `crates/d2d-ffi/decisive-test.sh` runs every passing scene through the DLLs; the only
+differences left there are the fallback-font text cases described in [gaps.md](gaps.md).
 
-2. **Cross-target parity** — the *same* suite and oracle run on x86-64, `wasm32` (Node and a real
-   headless browser), `aarch64` (qemu) and `x86_64-pc-windows-gnu` (Wine). `scripts/conformance.sh
-   parity` asserts an identical full-output digest across every target runnable on the host, proving
-   the renderer is bit-identical everywhere, not just on the dev machine.
+The examples. `crates/d2d-ffi/examples/run-examples.sh` builds small C, C++ and Rust programs
+against the standard API and checks that what each one reads back matches the capture.
 
-3. **Drop-in DLL (decisive)** — the exported `d2d1.dll` + `dwrite.dll` are dropped beside the
-   *unchanged* harness `d2d-ref.exe` and driven through the genuine COM ABI under Wine, comparing to
-   the oracle (pixels **and** the HRESULT/tag/query channel). This is the end-to-end proof that the
-   exported DLL — not just the Rust core — reproduces native. The C-API gate renders the FFI scene
-   set this way: **95 of 95 byte-exact** against the oracle, and **0 of 88 differences** between the
-   drop-in DLL and the Rust core on the same scenes — the DLL reproduces the core exactly through the
-   ABI. The deeper `crates/d2d-ffi/decisive-test.sh` run (every passing scene through the DLL) is a
-   standalone verification; its only remaining deltas are non-Latin fallback-glyph residuals in the
-   core text path (see [gaps.md](gaps.md)), not the COM/ABI layer.
+The fuzzer. Besides the hand-written scenes, a fuzzer generates random scenes and compares them in
+the same way. 98.1% of about 20,600 such scenes match. The fuzzer is in `tools/fuzz` and `harness`.
 
-The consumer examples add a fourth check: `crates/d2d-ffi/examples/run-examples.sh` builds a C, C++
-and Rust program against the standard API and asserts each one's readback is byte-identical to the
-oracle through the raw COM ABI.
+## Running the checks
 
-## Reproducing
+These need the Windows captures, pointed to by `D2D_SUITE`.
 
 ```sh
-scripts/conformance.sh native        # CPU core vs oracle (x86-64 host)
-scripts/conformance.sh wasm          # same suite under Node
-scripts/conformance.sh windows       # same suite as a Windows exe under Wine
-scripts/conformance.sh parity        # assert identical digest across all host-runnable targets
-crates/d2d-ffi/decisive-test.sh      # the drop-in DLL vs oracle under Wine (sandbox off)
-crates/d2d-ffi/examples/run-examples.sh   # the C/C++/Rust consumer examples vs oracle
+scripts/conformance.sh native        # the renderer on x86-64
+scripts/conformance.sh wasm          # the same suite under Node
+scripts/conformance.sh windows       # the same suite as a Windows program under Wine
+scripts/conformance.sh parity        # check every platform gives the same output
+crates/d2d-ffi/decisive-test.sh      # the drop-in DLLs under Wine
+crates/d2d-ffi/examples/run-examples.sh   # the C, C++ and Rust examples
 ```
-
-A one-LSB difference is a diagnostic, never a pass. Floating-point targets are compared by raw bits.

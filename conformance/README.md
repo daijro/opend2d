@@ -1,31 +1,38 @@
 # conformance
 
-The cross-platform conformance runner and its test corpus. Native `d2d1.dll` on Windows WARP is the
-oracle; a case passes only on **exact** pixel match (raw-bit for float targets), never a tolerance.
+This directory holds the cross-platform conformance runner and its test corpus. Direct2D (d2d1.dll
+on Windows WARP) is the reference. A case passes only on an exact pixel match, never within a
+tolerance, and float targets are compared on their raw bits.
 
-## suite/ — the corpus (private git submodule)
+## The corpus: suite/
 
-All scenes, native WARP/DirectWrite captures (oracles), the ratchet, the scene generators, and the
-per-suite fixture data live in a **separate private repository**, added here as the git submodule
-`conformance/suite` so that opend2d itself tracks only code. Layout and the add-a-scene / capture
-workflow are in that repo's own `README.md`.
+The scenes, the Windows WARP and DirectWrite captures they are checked against, the ratchet, the
+scene generators and the per-suite fixture data all live in a separate private repository. It is
+added here as the git submodule `conformance/suite`, so OpenD2D itself tracks only code. That
+repository's own `README.md` describes its layout and how to add and capture a scene.
 
-- Initialise it in a worktree with `git submodule update --init conformance/suite` (clones from the
-  configured URL — a local path for now, repointed to the private remote by the coordinator).
-- The runner finds it via `d2d_reference::suite_dir()` (and the matching resolver in the decisive.py
-  runners and `scripts/gen-wasm-embed.sh`): `$D2D_SUITE`, else this in-tree submodule, else the main
-  checkout's `conformance/suite`, else absent. **Absent ⇒ every runner and test skips cleanly**, so a
-  public clone without the submodule builds and its tests pass.
+To initialise it in a worktree, run `git submodule update --init conformance/suite`. This clones
+from the configured URL, which is a local path for now and will be repointed at the private remote.
 
-## the runner
+The runner finds the suite through `d2d_reference::suite_dir()`, and the decisive.py runners and
+`scripts/gen-wasm-embed.sh` use a matching resolver. They look, in order, at `$D2D_SUITE`, this
+in-tree submodule, and the main checkout's `conformance/suite`. If none of these exists, every
+runner and test skips cleanly, so a public clone without the submodule still builds and passes its
+tests.
 
-`crates/d2d/tests/conformance.rs` replays the corpus on Windows, Linux, macOS, FreeBSD and `wasm32`
-in a browser, reports exact-pass counts and the first differing coordinate/channel, and holds the
-line against `suite/passing.txt`. `scripts/conformance.sh <native|wasm|windows|aarch64|parity|…>`
-drives one target each; `parity` proves the full-output digest is identical across targets. The
-`wasm32` build has no filesystem, so `scripts/gen-wasm-embed.sh` bakes the suite into
-`crates/d2d/tests/embed/` (committed empty, overwritten locally — never commit the populated form).
+## The runner
 
-See `crates/d2d-types/` for the frozen value/layout/command contracts, and `harness/` for the
-reference-capture and image-diff tooling (`harness/vm.py` drives the reference VM; captured oracles
-are written into `conformance/suite/oracle/win11-26100/`).
+`crates/d2d/tests/conformance.rs` replays the corpus on Windows, Linux, macOS, FreeBSD and in a
+browser as `wasm32`. It reports how many cases pass exactly and, for each failure, the first
+coordinate and channel that differ. It also holds the line against `suite/passing.txt`.
+
+`scripts/conformance.sh <native|wasm|windows|aarch64|parity|…>` drives one target per run. The
+`parity` target checks that the full-output digest is identical across targets.
+
+The `wasm32` build has no filesystem, so `scripts/gen-wasm-embed.sh` bakes the suite into
+`crates/d2d/tests/embed/`. That directory is committed empty and overwritten locally. Never commit
+the populated version.
+
+The frozen value, layout and command contracts are in `crates/d2d-types/`. The reference-capture
+and image-diff tooling is in `harness/`: `harness/vm.py` drives the reference VM, and captured
+Windows output is written to `conformance/suite/oracle/win11-26100/`.

@@ -1,100 +1,114 @@
 # Known gaps
 
-What is not yet byte-exact or not yet implemented, as distinct from the
-[deliberate native-matching rejections](api.md#deliberate-native-matching-rejections). Behavioural
-truth is the conformance suite's pass list (6132 of 6159 suite scenes
-byte-exact; 7 skip, 20 not yet exact) and the differential fuzzer (98.1% of ~20,600 random scenes
-byte-exact); this file explains the delta.
+This page lists where OpenD2D does not yet match Direct2D exactly, and what it does not implement
+yet. Some methods fail on purpose because Direct2D fails in the same way; those are listed
+separately under [deliberate native-matching rejections](api.md#deliberate-native-matching-rejections).
 
-## Text — non-Latin fallback glyphs
+The test results are the real measure: 6132 of the 6159 test scenes match Direct2D exactly (7 are
+skipped and 20 do not match yet), and so do 98.1% of about 20,600 randomly generated scenes. This
+page describes the rest.
 
-The scenes that pass in the core but differ when driven through the drop-in DLL are non-Latin
-fallback-glyph residuals in the DirectWrite path (hinted device placement for complex scripts), not a
-COM/ABI fault — the same scenes differ by the same pixels whether driven by the Rust core directly or
-through the exported DLLs. ClearType filtering and the coverage scan are proven byte-identical
-to native; the residual is hinting/placement for fallback faces. Tracked in the core text work.
+## What the differences look like
+
+Each row is one example of an open difference. The first two images are the same scene drawn by
+Direct2D on Windows and by OpenD2D in this release, cropped to the area where they differ. The third
+image is the difference between them, amplified 64 times so that even a one-step change in a color
+channel shows up; black means the pixels are identical. The last column counts the pixels that
+differ and gives the largest difference in any one channel, out of 255.
+
+| Area | Direct2D | OpenD2D | Difference | Pixels that differ |
+| --- | --- | --- | --- | --- |
+| Color emoji in a turned group (COLR) | <img src="showcase/gaps/text-colour-emoji.direct2d.png" width="240"> | <img src="showcase/gaps/text-colour-emoji.opend2d.png" width="240"> | <img src="showcase/gaps/text-colour-emoji.diff.png" width="240"> | 256 (largest error 1/255) |
+| Hinted italic text | <img src="showcase/gaps/text-hinted-italic.direct2d.png" width="240"> | <img src="showcase/gaps/text-hinted-italic.opend2d.png" width="240"> | <img src="showcase/gaps/text-hinted-italic.diff.png" width="240"> | 18 (largest error 21/255) |
+| Synthetic bold in a GDI-measured run | <img src="showcase/gaps/text-synthetic-bold.direct2d.png" width="240"> | <img src="showcase/gaps/text-synthetic-bold.opend2d.png" width="240"> | <img src="showcase/gaps/text-synthetic-bold.diff.png" width="240"> | 317 (largest error 154/255) |
+| Upright emoji in vertical text | <img src="showcase/gaps/text-vertical-emoji.direct2d.png" width="240"> | <img src="showcase/gaps/text-vertical-emoji.opend2d.png" width="240"> | <img src="showcase/gaps/text-vertical-emoji.diff.png" width="240"> | 299 (largest error 197/255) |
+| Bitmap brush with anisotropic sampling | <img src="showcase/gaps/bitmap-anisotropic.direct2d.png" width="240"> | <img src="showcase/gaps/bitmap-anisotropic.opend2d.png" width="240"> | <img src="showcase/gaps/bitmap-anisotropic.diff.png" width="240"> | 104 (largest error 1/255) |
+| Bitmap with high-quality cubic sampling | <img src="showcase/gaps/bitmap-hq-cubic.direct2d.png" width="240"> | <img src="showcase/gaps/bitmap-hq-cubic.opend2d.png" width="240"> | <img src="showcase/gaps/bitmap-hq-cubic.diff.png" width="240"> | 23 (largest error 1/255) |
+| Two image draws sharing Direct2D's atlas | <img src="showcase/gaps/bitmap-atlas.direct2d.png" width="240"> | <img src="showcase/gaps/bitmap-atlas.opend2d.png" width="240"> | <img src="showcase/gaps/bitmap-atlas.diff.png" width="240"> | 12 (largest error 12/255) |
+| LookupTable3D with an 8-bit table | <img src="showcase/gaps/effect-lut3d-8bit.direct2d.png" width="240"> | <img src="showcase/gaps/effect-lut3d-8bit.opend2d.png" width="240"> | <img src="showcase/gaps/effect-lut3d-8bit.diff.png" width="240"> | 104 (largest error 1/255) |
+
+## Text
+
+Most text matches Direct2D exactly. The open cases are some color emoji (COLR glyphs that are
+rotated, skewed or overlap each other), hinted text in some fonts and in fallback fonts for
+non-Latin scripts, synthetic bold in layouts measured in GDI mode, upright emoji in vertical text,
+Arabic justification with kashida, and Thai line breaking. Thai line breaking needs a word
+dictionary that OpenD2D cannot ship, so it is off by default.
+
+For fallback fonts the difference is in where hinting places the glyphs. ClearType filtering and
+glyph coverage already match exactly, and the same scenes differ by the same pixels whether you call
+the Rust renderer directly or go through the DLLs, so this is not a problem in the DLL layer.
+
+## Bitmaps
+
+Bitmaps drawn with anisotropic or high-quality cubic sampling can be off by one step in a color
+channel when the bitmap is rotated or placed at a fractional position. Direct2D also packs some
+intermediate images into a shared texture atlas, and a few draws that depend on that packing don't
+match yet.
 
 ## Effects and float targets
 
-A handful of effect and highp-float (`R16/R32` target) paths are still being matched; the 64 built-in
-effects are implemented but not all are certified byte-exact on every input. `CopyFromBitmap` /
-`Map` read-back of a highp-float target is not yet supported (the 4-byte BGRA/RGBA read-back path is).
+All 64 built-in effects are implemented, but not every one matches on every input yet. One example
+is LookupTable3D with 8-bit tables or with sizes that aren't powers of two. Some paths for
+high-precision float targets (the R16 and R32 formats) are also still being matched.
 
-## Platform build coverage (this host)
+Reading back a float target with CopyFromBitmap or Map is not supported yet. Reading back an ordinary
+8-bit-per-channel BGRA or RGBA target works, including the usual offscreen pattern: render into a bitmap created
+with D2D1_BITMAP_OPTIONS_TARGET, copy it into a staging bitmap created with CPU_READ and
+CANNOT_DRAW, then map the staging bitmap.
 
-`scripts/package.sh` builds and symbol-checks what the local toolchain can link —
-`x86_64-pc-windows-gnu` (MinGW) and `x86_64-unknown-linux-gnu` here — and compiles the core for
-`wasm32`. The other targets (`i686`/`aarch64` Windows, `aarch64` Linux, macOS, FreeBSD) `cargo check`
-cleanly but need their own linker/SDK to produce a shared library; run `package.sh` on such a host, or
-add a cross toolchain, to fill `dist/` in. Cross-target *rendering* parity is already proven for every
-target runnable here via `scripts/conformance.sh parity`.
+## Path geometry
 
-## Portable (non-Wine) COM surface
+ID2D1PathGeometry1::ComputePointAndSegmentAtLength matches Direct2D for lines, quadratic and cubic
+curves. Arcs don't match yet: Direct2D splits them into a different number of segments.
 
-The native Linux/macOS/FreeBSD `libd2d1.*` currently implements the render-and-read-back core
-(factory → device context → target bitmap → geometry/solid-brush fill → map), exercised by
-`crates/d2d-ffi/portable-test.c`. Text, effects and WIC save run through the Windows-ABI DLLs under
-Wine today; broadening the hand-built portable vtables to the full surface is incremental work
-(`crates/d2d-ffi/src/portable.rs`). On Windows and under Wine the whole COM surface above is live.
+## Partly implemented
 
-## ABI fixes made while packaging
+GDI metafile playback (DrawGdiMetafile) handles only basic records, because Direct2D passes full EMF
+playback to a separate Windows component that OpenD2D doesn't reproduce yet. Printing through
+ID2D1PrintControl produces whole-page raster output rather than vector content. DXGI surfaces and
+image sources are single-plane BGRA, without multi-plane YUV. ID2D1Geometry::Widen matches Direct2D
+for rectangles and for strokes with flat caps and miter or bevel joins, but not yet for round joins,
+round caps or square caps.
 
-- `ID2D1Bitmap1::CopyFromBitmap` now reads a rendered **target** bitmap's pixels (not only an uploaded
-  source), so the standard offscreen read-back — render to a `D2D1_BITMAP_OPTIONS_TARGET` bitmap,
-  `CopyFromBitmap` into a `CPU_READ|CANNOT_DRAW` staging bitmap, `Map` — works from a stand-alone app
-  (`crates/d2d-ffi/src/win/resources.rs`). Without it the standard read-back pattern returned
-  `E_NOTIMPL`.
-- The off-Windows `windowscodecs` library now also exports `DllCanUnloadNow`, matching native's
-  in-proc-server symbol surface (`crates/wic-ffi/src/lib.rs`).
-- `windowscodecs` now exports `WICCreateImagingFactory_Proxy` (the SDK's registration-free factory
-  call), so WIC can be deployed **app-local** without overwriting the system DLL — alongside a
-  registration-free COM manifest and `DllGetClassObject`. All three app-local routes, and the native
-  `ID2D1PathGeometry1::ComputePointAndSegmentAtLength` values, were verified by running the native and
-  our DLLs under Wine (geometry needs no device).
-- `ID2D1Factory1::CreatePathGeometry` (the `ID2D1PathGeometry1` overload) and
-  `ID2D1PathGeometry1::ComputePointAndSegmentAtLength` are now implemented (byte-exact vs native for
-  line/cubic/quadratic figures; arcs fan out to multiple segments, the known arc gap).
+## Methods that are not implemented
 
-## `E_NOTIMPL` stub inventory (`d2d-ffi`)
+Direct2D implements these, and OpenD2D does not yet:
 
-A sweep of every method in `crates/d2d-ffi/src/win/**` that can return `E_NOTIMPL`, separating genuine
-gaps from correct behaviour. Most `E_NOTIMPL` occurrences are **null-argument guards** — e.g.
-`CreateLinearGradientBrush`/`CreateImageBrush`/`CreateBitmapBrush` do `arg.as_ref().ok_or(E_NOTIMPL)?`
-and only error on a null input; those methods are implemented. The genuine whole-body stubs:
+- ID2D1RenderTarget::CreateSharedBitmap, a bitmap that shares a DXGI, WIC or memory handle.
+- ID2D1RenderTarget::CreateCompatibleRenderTarget, an offscreen bitmap render target.
+- ID2D1RenderTarget::CreateLayer, an explicit layer object. Layered drawing still works, because
+  PushLayer's parameters are applied directly; only the layer object is missing.
+- ID2D1RenderTarget::CreateMesh, the mesh object used by FillMesh.
+- ID2D1DeviceContext::GetGradientMeshWorldBounds.
+- CreateSvgGlyphStyle, GetColorBitmapGlyphImage and GetSvgGlyphImage, which return images of color
+  and SVG glyphs (Direct2D 1.3).
+- ID2D1Factory1::GetRegisteredEffects and GetEffectProperties, which list the registered effects.
+- ID2D1PathGeometry::Stream, which replays a stored path into a geometry sink.
 
-**Implemented this session (were stubs):**
-- `ID2D1Factory::CreateWicBitmapRenderTarget` — a render target over an `IWICBitmap`'s memory, portable
-  (no OS surface). Byte-exact vs native WARP for the present scenes through the real COM ABI under Wine
-  (`present-ref` `wic` mode, `present.py`).
-- `ID2D1RenderTarget::CreateBitmap` / `CreateBitmapFromWicBitmap` / `CreateBitmapBrush` (the **1.0**
-  overloads) — forward to the verified `ID2D1DeviceContext` 1.1 overloads (`ID2D1Bitmap1`/
-  `ID2D1BitmapBrush1` carry the 1.0 interfaces). The current harness drives the 1.1 interface, so these
-  are not independently oracle-tested, but the 1.1 target they forward to is byte-exact.
+Some methods need an operating system surface (a window, a DXGI surface, a GDI device context or an
+XPS print job), so they only work on Windows and under Wine: CreateHwndRenderTarget,
+CreateDxgiSurfaceRenderTarget, CreateDCRenderTarget, CreatePrintControl,
+CreateBitmapFromDxgiSurface and CreateImageSourceFromDxgi. The Linux and macOS library returns
+E_NOTIMPL for them.
 
-**Correct stubs — native also returns `E_NOTIMPL` (or the method is optional):**
-- `ID2D1EffectImpl::SetGraph` on the author support/test effects — the DDI makes `SetGraph` optional
-  (only effects whose input count varies implement it); native effects return `E_NOTIMPL` too.
+## The Linux, macOS and FreeBSD libraries
 
-**By design off-Windows — implemented on Windows and under Wine, `E_NOTIMPL` only off-Windows:**
-- `ID2D1Factory::CreateHwndRenderTarget` / `CreateDxgiSurfaceRenderTarget` / `CreateDCRenderTarget` /
-  `CreatePrintControl`, `ID2D1DeviceContext::CreateBitmapFromDxgiSurface` / `CreateImageSourceFromDxgi`
-  — each needs an OS surface (HWND / DXGI / GDI DC / XPS). The drop-in `d2d1.dll` implements them; the
-  native Linux/macOS library returns `E_NOTIMPL` because those surfaces don't exist there.
+Outside Windows, libd2d1 currently covers the basic path: create a factory, a device context and a
+target bitmap, fill geometry with a solid brush, and read the result back.
+`crates/d2d-ffi/portable-test.c` tests it. Text, effects and saving images through WIC currently go
+through the Windows DLLs under Wine. On Windows and under Wine the whole COM API is available.
 
-**Real gaps — native implements them, not yet wired (1.0/1.1 object-returning methods):**
-- `ID2D1RenderTarget::CreateSharedBitmap` — a bitmap aliasing a DXGI/WIC/memory handle.
-- `ID2D1RenderTarget::CreateCompatibleRenderTarget` — an offscreen `ID2D1BitmapRenderTarget`.
-- `ID2D1RenderTarget::CreateLayer` — an explicit `ID2D1Layer` (the core applies `PushLayer` params
-  directly, so layered scenes render, but the handle itself isn't vended).
-- `ID2D1RenderTarget::CreateMesh` — an `ID2D1Mesh` for `FillMesh`.
-- `ID2D1DeviceContext::GetGradientMeshWorldBounds`.
-- `ID2D1DeviceContext2/3::CreateSvgGlyphStyle` / `GetColorBitmapGlyphImage` / `GetSvgGlyphImage` —
-  D2D1.3 colour/SVG glyph imaging.
-- `ID2D1Factory1::GetRegisteredEffects` / `GetEffectProperties` — effect-registry introspection.
-- `ID2D1PathGeometry::Stream` — replay a stored path's figures into a sink (the inverse of `Open`).
+## Platform builds
 
-## Out of scope here
+`scripts/package.sh` builds and checks every target the local toolchain can link. On the current
+build machine that is x86_64-pc-windows-gnu and x86_64-unknown-linux-gnu, plus the renderer for
+wasm32. The other targets (32-bit and ARM Windows, ARM Linux, macOS and FreeBSD) compile with cargo
+check, but need their own linker or SDK to produce a library. Output is already proven identical on
+every target the build machine can run, with `scripts/conformance.sh parity`.
 
-The GPU backend (`crates/d2d-wgpu`) and arbitrary pixel/compute-shader translation
-(`crates/d2d-shader`) are secondary acceleration tracks behind the authoritative CPU renderer and are
-not part of the drop-in parity guarantee. Paint.NET plugin hosting lives in a separate project.
+## Not covered
+
+The GPU backend (`crates/d2d-wgpu`) and the translation of custom pixel and compute shaders
+(`crates/d2d-shader`) are experimental. The CPU renderer is the reference, and the parity results
+above apply to it only.

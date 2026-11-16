@@ -1,10 +1,10 @@
-# opend2d conformance in the browser (phase 4A)
+# OpenD2D conformance in the browser
 
-This crate compiles the conformance suite — the exact driver and oracle corpus from
-`crates/d2d/tests/conformance.rs` — to wasm32 and runs it in a browser. No logic is duplicated:
-`src/lib.rs` includes that test file as a module and wraps its `report()` for JS (see
-`src/lib.rs`). The wasm32 build has no filesystem, so the corpus is baked in at compile time from
-`crates/d2d/tests/embed/corpus.rs` (regenerate with `scripts/gen-wasm-embed.sh`).
+This crate compiles the conformance suite to wasm32 and runs it in a browser. It uses exactly the
+same driver and corpus as `crates/d2d/tests/conformance.rs`, with no logic duplicated: `src/lib.rs`
+includes that test file as a module and wraps its `report()` for JavaScript. The wasm32 build has
+no filesystem, so the corpus is baked in at compile time from `crates/d2d/tests/embed/corpus.rs`.
+Regenerate it with `scripts/gen-wasm-embed.sh`.
 
 ## The page
 
@@ -13,12 +13,14 @@ scripts/conformance.sh web            # builds web/pkg
 python3 -m http.server -d web 8000    # then open http://localhost:8000
 ```
 
-The page runs every scene and shows pass/skip/fail, the full-output digest, and any regression.
+The page runs every scene and shows which ones passed, were skipped or failed, along with the
+full-output digest and any regression.
 
 ## One-command checks
 
-Each drives the same suite against the same oracle; `parity` proves bit-identical output across the
-targets runnable on the host. Set `OFFLINE=1` to use only the local cargo cache.
+Each of these runs the same suite against the same Windows captures. `parity` checks that the
+output is bit-identical across all the targets the host can run. Set `OFFLINE=1` to use only the
+local cargo cache.
 
 ```sh
 scripts/conformance.sh native         # x86_64 host
@@ -29,6 +31,7 @@ scripts/conformance.sh checks         # compile for aarch64 / macOS / FreeBSD
 scripts/conformance.sh parity         # assert identical digest on native + wasm + Windows
 ```
 
-The wasm runs need `wasm-bindgen-cli` matching the pinned `wasm-bindgen` (0.2.128) and, for
-`wasm-browser`, `chromedriver` on `PATH`. CI (`.github/workflows/conformance.yml`) runs all targets,
-including aarch64 (qemu), native Windows, macOS and FreeBSD, and gates on identical digests.
+The wasm runs need a `wasm-bindgen-cli` that matches the pinned `wasm-bindgen` version (0.2.128),
+and `wasm-browser` also needs `chromedriver` on `PATH`. CI (`.github/workflows/conformance.yml`)
+runs every target, including aarch64 under qemu, Windows itself, macOS and FreeBSD, and fails
+unless the digests are identical.

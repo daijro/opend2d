@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Generate the native-vs-OpenD2D showcase: docs/showcase/*.png and the table in README.md.
+"""Generate the Direct2D-vs-OpenD2D showcase: docs/showcase/*.png and the table in README.md.
 
 For each showcased scene: render it with opend2d through the drop-in d2d1.dll under Wine (our render),
-read the captured native WARP oracle, and write native.png / opend2d.png / a diff.png (black where
-equal, amplified where not), with the byte-compare result. Rerun as conformance improves — the pass
-set only grows. Invoked by scripts/showcase.sh (which builds + stages the DLLs and d2d-ref.exe).
+read the captured native WARP oracle, and write direct2d.png / opend2d.png / a diff.png (black where
+equal, amplified where not), with the byte-compare result. Every image is placed on the same 512x384
+frame, scaled up by a whole number so pixels stay sharp. Rerun as conformance improves. Invoked by scripts/showcase.sh (which builds + stages the DLLs and d2d-ref.exe).
 
 Public scenes only: the private corpus (canvas-*/textx-*/sundial) is never shown. Env: STAGE (dir with
 d2d-ref.exe + our d2d1/dwrite/windowscodecs), WINEPREFIX, D2D_FONTS. Run with python3 -I."""
@@ -17,7 +17,7 @@ SUITE = next(pathlib.Path(p) for p in (os.environ.get("D2D_SUITE"), ROOT / "conf
              pathlib.Path(subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True).stdout.strip() or ".").parent / "conformance/suite") if p and pathlib.Path(p, "scenes").is_dir())
 ORACLE = SUITE / "oracle/win11-26100"
 OUT = ROOT / "docs/showcase"
-SCALE = 4       # nearest-neighbour upscale for display (scenes are 128x96 etc.)
+FRAME = (512, 384)  # every showcase image is this size; scenes are scaled up by a whole number to fit
 AMP = 16        # diff amplification: a 1/255 difference shows as 16/255
 
 # area, scene, one-line description. First 12 are byte-exact (in conformance/passing.txt); the last
@@ -56,7 +56,17 @@ def straight_rgba(bgra, w, h):
     return img
 
 def up(img):
-    return img.resize((img.width * SCALE, img.height * SCALE), Image.NEAREST)
+    """Scale up by the largest whole number that fits FRAME and centre on a transparent FRAME canvas."""
+    fw, fh = FRAME
+    k = max(1, min(fw // img.width, fh // img.height))
+    if img.width > fw or img.height > fh:
+        s = min(fw / img.width, fh / img.height)
+        big = img.resize((max(1, int(img.width * s)), max(1, int(img.height * s))), Image.LANCZOS)
+    else:
+        big = img.resize((img.width * k, img.height * k), Image.NEAREST)
+    canvas = Image.new("RGBA", FRAME, (0, 0, 0, 0))
+    canvas.paste(big, ((fw - big.width) // 2, (fh - big.height) // 2))
+    return canvas
 
 def main():
     entries = []
@@ -78,7 +88,7 @@ def main():
         d = OUT / area
         d.mkdir(parents=True, exist_ok=True)
         nat, op = straight_rgba(oracle, w, h), straight_rgba(ours, w, h)
-        up(nat).save(d / f"{name}.native.png")
+        up(nat).save(d / f"{name}.direct2d.png")
         up(op).save(d / f"{name}.opend2d.png")
         diff = ImageChops.difference(nat.convert("RGB"), op.convert("RGB")).point(lambda x: min(255, x * AMP))
         up(diff).save(d / f"{name}.diff.png")
@@ -87,11 +97,11 @@ def main():
         print(f"{name:34} {w}x{h}  {result}")
 
     # One table in README.md, between the showcase markers.
-    rows = ["| Scene | Native | OpenD2D | Diff | Result |", "| --- | --- | --- | --- | --- |"]
+    rows = ["| Scene | Direct2D | OpenD2D | Difference | Result |", "| --- | --- | --- | --- | --- |"]
     for area, name, desc, result in entries:
         rel = f"docs/showcase/{area}/{name}"
         img = lambda kind: f'<img src="{rel}.{kind}.png" width="240">'
-        rows.append(f"| {desc} | {img('native')} | {img('opend2d')} | {img('diff')} | {result} |")
+        rows.append(f"| {desc} | {img('direct2d')} | {img('opend2d')} | {img('diff')} | {result} |")
     readme = ROOT / "README.md"
     start, end = "<!-- showcase:start -->", "<!-- showcase:end -->"
     t = readme.read_text()

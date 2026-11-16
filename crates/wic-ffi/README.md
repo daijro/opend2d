@@ -1,34 +1,41 @@
 # wic-ffi
 
-The drop-in **`windowscodecs.dll`** — the WIC COM surface Direct2D apps load and save images through.
-The `[lib]` is named `windowscodecs` (`cdylib` + `rlib`). It exports the COM in-proc-server entry
-points `DllGetClassObject` / `DllCanUnloadNow` plus `WICCreateImagingFactory_Proxy` (the SDK's
-registration-free factory call); `CoCreateInstance(CLSID_WICImagingFactory)` hands back
-a real `IWICImagingFactory` (`#[implement]` with the official `windows` IIDs/vtables), forwarding to
-[`d2d::wic`](../d2d) — decoders, format converter, scalers, flip-rotator, clipper, and the
-PNG/TIFF/GIF/BMP/JPEG encoders.
+This crate builds the drop-in windowscodecs.dll, the WIC COM surface that Direct2D applications
+load and save images through. The `[lib]` is named `windowscodecs` and is built as `cdylib` and
+`rlib`.
 
-Our WIC bitmaps implement the public `IWICBitmapSource` ABI, so our `d2d1.dll`'s
-`CreateBitmapFromWicBitmap` / `CreateImageSourceFromWic` consume them with no extra interop.
+It exports the COM in-process server entry points DllGetClassObject and DllCanUnloadNow, plus
+WICCreateImagingFactory_Proxy, the SDK's registration-free factory call. Calling
+CoCreateInstance(CLSID_WICImagingFactory) returns a real IWICImagingFactory, built with
+`#[implement]` on the official `windows` IIDs and vtables, that forwards to [`d2d::wic`](../d2d).
+That covers the decoders, format converter, scalers, flip-rotator, clipper, and the PNG, TIFF, GIF,
+BMP and JPEG encoders.
 
-- 23 WIC interfaces (factory, decoder/frame-decode, encoder/frame-encode, format converter, palette,
-  scaler/clipper/flip-rotator, stream, colour context, metadata, pixel-format/codec info) plus the
-  `IClassFactory`/enumerator plumbing.
-- Off Windows the WIC definitions are `cfg(windows)`-gated, so the library exposes only
-  `DllGetClassObject`/`DllCanUnloadNow` returning `E_NOTIMPL`.
+OpenD2D's WIC bitmaps implement the public IWICBitmapSource ABI, so OpenD2D's d2d1.dll can consume
+them in CreateBitmapFromWicBitmap and CreateImageSourceFromWic with no extra interop.
 
-**Deployment note:** WIC is a COM in-process server the loader finds by the absolute registry path
-(`…\System32\windowscodecs.dll`), so `CoCreateInstance` alone won't pick up an app-local copy, and the
-protected system DLL should not be overwritten. Deploy app-local via `WICCreateImagingFactory_Proxy`,
-a registration-free COM manifest, or `DllGetClassObject` directly (README quick start (a); all verified
-under Wine). Under Wine, dropping it in the prefix's `system32` also works.
+It implements 23 WIC interfaces, plus the IClassFactory and enumerator plumbing. They cover the
+factory, decoder and frame decode, encoder and frame encode, format converter, palette, scaler,
+clipper, flip-rotator, stream, colour context, metadata, and pixel format and codec info.
+
+Off Windows, the WIC definitions are gated behind `cfg(windows)`, so the library only exposes
+DllGetClassObject and DllCanUnloadNow, both returning E_NOTIMPL.
+
+## Deployment
+
+WIC is a COM in-process server that the loader finds through an absolute registry path
+(`…\System32\windowscodecs.dll`). CoCreateInstance on its own therefore will not pick up a copy
+next to the application, and the protected system DLL should not be overwritten. To use this copy
+app-locally, call WICCreateImagingFactory_Proxy, use a registration-free COM manifest, or call
+DllGetClassObject directly (see Getting started in the top-level [README](../../README.md)). All
+three are verified under Wine. Under Wine, putting it in the prefix's `system32` also works.
 
 ```sh
 cargo build --release -p wic-ffi --target x86_64-pc-windows-gnu   # windowscodecs.dll
 ```
 
-Verified under Wine by the metadata/decode oracle (`crates/d2d/tests/wic_com/`) and the consumer
-examples' WIC-PNG save (`crates/d2d-ffi/examples/run-examples.sh`).
+It is verified under Wine by the metadata and decode checks in `crates/d2d/tests/wic_com/`, and by
+the consumer examples saving a PNG through WIC (`crates/d2d-ffi/examples/run-examples.sh`).
 
 ## License
 
