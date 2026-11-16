@@ -2,7 +2,7 @@
 
 What is not yet byte-exact or not yet implemented, as distinct from the
 [deliberate native-matching rejections](api.md#deliberate-native-matching-rejections). Behavioural
-truth is [`conformance/passing.txt`](../conformance/passing.txt) (6132 of 6159 suite scenes
+truth is the conformance suite's pass list (6132 of 6159 suite scenes
 byte-exact; 7 skip, 20 not yet exact) and the differential fuzzer (98.1% of ~20,600 random scenes
 byte-exact); this file explains the delta.
 
