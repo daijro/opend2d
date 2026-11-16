@@ -18,6 +18,7 @@ runner_env=(CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER=wasm-bindgen-test-runner)
 fonts_dir() {
   local g; g=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
   local d="$(dirname "$g")/ref/windows/Fonts"; [ -d "$d" ] && printf %s "$d"
+  return 0 # no fonts (a public clone): not an error, text scenes just skip
 }
 f=${D2D_FONTS:-$(fonts_dir)}; [ -n "$f" ] && export D2D_FONTS="$f"
 # Bake the corpus and fonts into the wasm build (wasm has no filesystem). Idempotent; run before any
