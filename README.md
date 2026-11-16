@@ -5,12 +5,15 @@ the same pixels as native Direct2D on Windows' WARP software device, and it expo
 interfaces and DLL exports, so applications can use it as a drop-in replacement. It runs on Windows,
 Linux, macOS, FreeBSD, and in the browser.
 
+> This software was largely built with the help of Claude. Please use with caution!
+
 > [!WARNING]
 > **This is a public demo beta (0.1.0-beta.1). Full parity with Direct2D is not complete yet.**
 > 27 of 6,159 suite scenes and about 390 of 20,600 fuzz scenes still differ from native Windows, and
 > some API methods are not implemented. Don't rely on it matching Windows in every case yet.
 
-Not at parity yet:
+<details>
+<summary>Not at parity yet</summary>
 
 - **Text:** some color emoji (rotated, skewed or overlapping COLR glyphs), hinted text in some fonts
   and in non-Latin fallback fonts, synthetic bold in GDI-measured layouts, upright emoji clusters in
@@ -31,7 +34,7 @@ Not at parity yet:
 
 Details in [docs/gaps.md](docs/gaps.md).
 
-> This software was largely built with the help of Claude. It was built for experimental and personal use only. Please use with caution.
+</details>
 
 <hr width=50>
 
@@ -48,6 +51,7 @@ fuzz scenes is (`tools/fuzz` and `harness`).
 | Fuzz scenes byte-exact | 98.1% (390 of ~20,600 differ) |
 | Same output on x86-64, wasm32, aarch64, and Windows under Wine | yes |
 | C, C++, and Rust examples byte-exact through the COM ABI | yes |
+
 
 <hr width=50>
 
@@ -207,3 +211,4 @@ OpenD2D is licensed under the GNU General Public License, version 3 or later (se
 Its Windows API bindings are generated from Microsoft's MIT-licensed Win32 metadata, and parts of the
 geometry code are ported from Microsoft's MIT-licensed WPF sources. Those and the other
 third-party components are listed in [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES).
+
