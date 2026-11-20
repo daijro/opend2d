@@ -1,0 +1,18 @@
+[package]
+name = "d2d-shader"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+# WARP's shader-math intrinsics, split out so the paint.rs port can share them; re-exported as
+# `d2d_shader::warpmath`.
+warpmath = { path = "../warpmath" }
+
+[dev-dependencies]
+# The WARP sampler parity test compares against d2d::sampling (a dev-dependency cycle is allowed).
+d2d = { path = "../d2d" }
+# The private conformance suite holds the captured shader fixtures.
+d2d-reference = { path = "../../harness" }
+serde_json = "1.0.149"

@@ -1,0 +1,116 @@
+[package]
+name = "d2d"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+d2d-types = { path = "../d2d-types" }
+# ucrtbase CRT maths, split out so the paint.rs port can share them; re-exported as `d2d::crt`.
+crt = { path = "../crt" }
+# Phase 2B-3: a custom effect's pixel shader is executed by this crate's WARP-exact DXBC CPU
+# executor (its public API only; the 3C crate owns it). No normal-dependency cycle — d2d-shader has
+# no normal deps; its dependency on d2d is dev-only.
+d2d-shader = { path = "../d2d-shader" }
+windows-core = { version = "=0.62.2", default-features = false }
+# WIC PNG decode: libpng is fully specified, so a conformant pure-Rust decoder's samples are
+# bit-identical to windowscodecs' (verified against the VM). Reused rather than reimplementing inflate.
+png = "0.17.16"
+# WIC JPEG-XR decode: ITU-T T.832 is fully specified; this is a `forbid(unsafe)` port of Microsoft's
+# own jxrlib decoder, bit-exact with it and (verified against the VM) with wmphoto.dll. Reused rather
+# than reimplementing the photo-core transform.
+openreadout-jpegxr = "=0.4.0"
+roxmltree = { version = "=0.20.0", default-features = false, features = ["std"] }
+# Font table parsing + glyph outlines ONLY (phase 2D). DirectWrite's hinting/rasterization is
+# reproduced in `src/text`, not taken from skrifa (see the module docs).
+skrifa = { version = "=0.47.0", default-features = false, features = ["std"] }
+
+# Phase 2D-2 text: shaping (HarfBuzz port) + font parsing via rustybuzz's ttf_parser
+# re-export, and the Unicode algorithms DirectWrite layout needs (bidi, script
+# itemization, line-break opportunities). All reference ports, verified against native.
+rustybuzz = "0.20.1"
+unicode-bidi = "0.3.18"
+unicode-script = "0.5.8"
+unicode-linebreak = "0.1.5"
+unicode-properties = { version = "0.1.4", default-features = false, features = ["general-category"] }
+# WIC TIFF Deflate (COMPRESSION_DEFLATE/ADOBE_DEFLATE); already in the tree via png.
+flate2 = "1.1.10"
+# Deterministic (pure-Rust) libm for the handful of std transcendentals d2d's CPU path uses only in
+# scenes that are not byte-exact to WARP (3D-transform sin/cos, combine atan2, SVG skew/number-format):
+# routing them through one impl on every target keeps the cross-platform digest identical. ucrtbase-
+# exact reproductions live in `crt` only for the functions a byte-exact scene depends on (pow, expf).
+libm = "=0.2.16"
+
+# WIC JPEG-XR *encode* as wmphoto.dll does it: a vendored, patched copy of jpegxr-pure-rs (BSD-3, a
+# translation of Microsoft's JXRLib). Two byte-parity fixes, a thin raw-codestream entry and
+# in-memory streams live in crates/vendor/jpegxr-pure-rs (see its README). Excluded from the
+# workspace, so its C-linking dev-dep is never built. Every target, wasm32 included: the encode path
+# touches no file system.
+jpegxr-pure-rs = { path = "../vendor/jpegxr-pure-rs" }
+
+[features]
+# Phase 4A: run the wasm32 conformance test in a headless browser instead of Node.
+conformance-browser = []
+# Text-raster diagnostic tool (OFF by default, never in a prod build): D2D_INJECT_CONTOURS swaps each
+# glyph's hinted output for native's captured fsc contour, to split a hinting residual from a raster one.
+# Enabled only for the conformance harness (`--features inject-contours`); see crates/d2d/src/text/mod.rs
+# `inject_contours` and the two-scale-gdi-hinting-gap work.
+inject-contours = []
+
+[dev-dependencies]
+# Reuse the harness's scene parser to drive oracle-conformance pixel tests (phases 1A/1B).
+d2d-reference = { path = "../../harness" }
+# Scene and oracle JSON, and the recorded query results, on every target including wasm32.
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+
+# Reuse our drop-in dwrite's verified system-font matcher (resolve_face) so the conformance/fuzz
+# harness resolves family+weight+style+stretch to the same face DirectWrite picks — a dev-only
+# dependency cycle (dwrite-ffi depends on d2d), which cargo permits for dev-dependencies. Non-wasm
+# only: the wasm parity build has no filesystem and loads fonts from the embedded table instead.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+dwrite-ffi = { path = "../dwrite-ffi" }
+# Construct effect CLSIDs from the scene strings in the 2B effect-graph test.
+windows-core = { version = "=0.62.2", default-features = false }
+# 2D text tests parse the font the way layout (2D.2) will, to build positioned glyph runs.
+skrifa = { version = "=0.47.0", default-features = false, features = ["std"] }
+
+# Phase 2C colour/transfer effects: a nested test dir, so declared explicitly (cargo only
+# auto-discovers tests/<name>/main.rs one level deep).
+[[test]]
+name = "effects_color"
+path = "tests/effects/color/main.rs"
+
+# Phase 2C built-in effects conformance (own test dir; 2B's engine covers these once on main).
+[[test]]
+name = "effects_transform"
+path = "tests/effects/transform/main.rs"
+
+# Phase 2C blend-family effect math vs oracle (nested dir isn't auto-discovered).
+[[test]]
+name = "effects-blend"
+path = "tests/effects/blend/main.rs"
+
+# Phase 2C filter-family effect tests (own directory): per-effect parity vs the WARP oracle.
+[[test]]
+name = "effects-filters"
+path = "tests/effects/filters/main.rs"
+
+# WIC JPEG-XR decode conformance vs real wmphoto.dll (nested dir isn't auto-discovered).
+[[test]]
+name = "wic_jxr"
+path = "tests/wic/jxr/main.rs"
+
+# Phase 4A: run the same conformance suite under a headless browser and Node. The scene/oracle
+# corpus is baked in via tests/embed.rs since wasm32 has no filesystem.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+# Pinned so the generated glue matches the wasm-bindgen CLI/runner (0.2.128); wasm-pack fetches the
+# matching CLI in CI. 0.3.78 pins wasm-bindgen =0.2.128.
+wasm-bindgen-test = "=0.3.78"
+
+# Phase 2D text blend vs oracle: native DirectWrite alpha textures → d2d text blend == native
+# DrawGlyphRun on WARP (fixtures captured from native).
+[[test]]
+name = "text_blend"
+path = "tests/text_blend/main.rs"

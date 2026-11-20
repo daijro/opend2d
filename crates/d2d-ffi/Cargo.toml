@@ -1,0 +1,29 @@
+[package]
+name = "d2d-ffi"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[lib]
+# `d2d1` so the shared library is `d2d1.dll` (Windows) / `libd2d1.so` etc. `rlib` too so the
+# in-process COM conformance test can drive the same objects without the OS loader. `staticlib` for
+# the `libd2d1.a` the .NET browser-wasm (emscripten) NativeFileReference relink needs.
+name = "d2d1"
+crate-type = ["cdylib", "rlib", "staticlib"]
+
+[dependencies]
+d2d = { path = "../d2d" }
+d2d-types = { path = "../d2d-types" }
+windows-numerics = "0.3.1"
+# Our drop-in dwrite.dll: `DrawText`/`DrawGlyphRun` QI its text objects for the private `ITextInterop`
+# to pull the `d2d::text` inputs across the DLL boundary (text rendering stays in the shared core).
+dwrite-ffi = { path = "../dwrite-ffi" }
+# `windows`/`windows_core` resolve to the shim crates (the real crates on Windows, windows-bindgen
+# output over `windows-core` elsewhere), so the one COM implementation in `win/*` compiles anywhere.
+windows = { package = "windows-shim", path = "../windows-shim" }
+windows_core = { package = "windows-core-shim", path = "../windows-core-shim" }
+
+[dev-dependencies]
+d2d-reference = { path = "../../harness" }
+serde_json = "1"

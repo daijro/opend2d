@@ -1,0 +1,172 @@
+[package]
+name = "d2d-reference"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+publish = false
+
+[features]
+# Native-detour / DDI instrumentation (the `*-dump` binaries below, `warp_ddi`, and render.rs's
+# draws/vbib dumps). Off by default so the public reference renderer (`d2d-ref`) and the fuzzer
+# (`fuzz-gen`, `wic-dump`) build and render identically without it; RE/dev workflows enable it.
+native-detour = []
+
+[dependencies]
+anyhow = "1.0.104"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+png = "0.17.16"
+# crt-verify checks the production maths ports against Windows' C runtimes.
+crt = { path = "../crates/crt" }
+
+[target.'cfg(windows)'.dependencies]
+# windows-core is named directly so the `#[implement]` macro's `::windows_core::` paths resolve.
+windows-core = "0.58.0"
+windows = { version = "0.58.0", features = [
+  "implement",
+  "Foundation_Numerics", "Win32_Foundation", "Win32_Graphics_Direct2D",
+  "Win32_Graphics_Direct2D_Common", "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11", "Win32_Graphics_DirectWrite",
+  "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common",
+  "Win32_Graphics_Gdi",
+  "Win32_Graphics_Imaging", "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage", "Win32_System_Variant",
+  "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+  # Print capture: a custom IPrintDocumentPackageTarget that writes native's XPS to a file.
+  "Win32_Storage_Xps", "Win32_Storage_Xps_Printing", "Win32_Storage_Packaging_Opc",
+  "Win32_Security",
+] }
+
+[profile.release]
+panic = "abort"
+
+# Native-detour / DDI dump tools: built only with --features native-detour, so the public
+# build excludes them. (wic-dump is the public WIC fuzzer renderer and stays auto-discovered.)
+[[bin]]
+name = "blur-ddi-dump"
+path = "src/bin/blur-ddi-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "colr-atlas-dump"
+path = "src/bin/colr-atlas-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "colr-ddi-dump"
+path = "src/bin/colr-ddi-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "colr-ramp-dump"
+path = "src/bin/colr-ramp-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "colr-warm-dump"
+path = "src/bin/colr-warm-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "d2d-ref-dump"
+path = "src/bin/d2d-ref-dump.rs"
+required-features = ["native-detour"]
+
+# d2d1 GlyphRunFiller::FillSubrect oracle — captures the merged 1-bit coverage buffer, the per-subrect
+# phase and the window for a glyph run, to pin D2D's GPU glyph coverage against dwrite's. VM-only.
+[[bin]]
+name = "d2d1-dump"
+path = "src/bin/d2d1-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "dwrite-dump"
+path = "src/bin/dwrite-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "fill-dump"
+path = "src/bin/fill-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "fx-ddi-dump"
+path = "src/bin/fx-ddi-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "gradmesh-vs-dump"
+path = "src/bin/gradmesh-vs-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "hs-ddi-dump"
+path = "src/bin/hs-ddi-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "hwnd-sem-dump"
+path = "src/bin/hwnd-sem-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "ink-aliased-dump"
+path = "src/bin/ink-aliased-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "ink-vs-dump"
+path = "src/bin/ink-vs-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "jit-dump"
+path = "src/bin/jit-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "linear-grad-dump"
+path = "src/bin/linear-grad-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "mesh-grad-dump"
+path = "src/bin/mesh-grad-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "mesh-vs-dump"
+path = "src/bin/mesh-vs-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "radial-vs-dump"
+path = "src/bin/radial-vs-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "realize-vs-dump"
+path = "src/bin/realize-vs-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "swapchain-dump"
+path = "src/bin/swapchain-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "text-blend-dump"
+path = "src/bin/text-blend-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "textout-dump"
+path = "src/bin/textout-dump.rs"
+required-features = ["native-detour"]
+
+[[bin]]
+name = "wic-colorctx-dump"
+path = "src/bin/wic-colorctx-dump.rs"
+required-features = ["native-detour"]
+

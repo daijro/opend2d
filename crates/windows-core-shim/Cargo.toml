@@ -1,0 +1,17 @@
+[package]
+name = "windows-core-shim"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+publish = false
+
+# Consumed under the name `windows_core` (Cargo `package=` rename) so it is the single canonical
+# source on every target: on Windows it just re-exports the real `windows-core`; off Windows it adds
+# the pointer-string types / `Free` trait that crate gates behind `#[cfg(windows)]`. Not in the
+# workspace `members`; it is an implicit member (a path dependency of the ffi crates).
+[lib]
+name = "windows_core_shim"
+path = "src/lib.rs"
+
+[dependencies]
+windows-core = "=0.62.2"
