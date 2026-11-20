@@ -1,0 +1,29 @@
+[package]
+name = "d2d-wgpu"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+# Phase 3B optional GPU backend. CPU (`d2d`) stays authoritative; this accelerates only the
+# operations whose arithmetic is pure integer — the one class WGSL guarantees bit-identical on
+# every conformant device (floating-point may be reassociated/fused, so a float shader can never
+# claim parity). See `src/lib.rs`.
+[dependencies]
+d2d-types = { path = "../d2d-types" }
+# wgpu (native) / WebGPU (browser). WGSL shader input only; backends selected per target below.
+wgpu = { version = "=30.0.1", default-features = false, features = ["std", "wgsl"] }
+bytemuck = { version = "1", features = ["derive"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Every native backend (each is target-gated inside wgpu, so only the host one builds).
+wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan", "metal", "dx12", "gles"] }
+# D2D callers are synchronous; block on GPU readback. The browser drives completion itself.
+pollster = "0.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wgpu = { version = "=30.0.1", default-features = false, features = ["webgpu"] }
+
+[dev-dependencies]
+# Parity tests compare GPU readback byte-for-byte against the authoritative CPU rasterizer.
+d2d = { path = "../d2d" }

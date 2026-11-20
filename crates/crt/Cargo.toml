@@ -1,0 +1,10 @@
+# ucrtbase's CPU-side CRT maths (sinf/cosf/atan2f/pow/powf), bit-exact and platform-independent
+# (AMD aocl-libm-ose / Arm optimized-routines, verified against ucrtbase on Windows). d2d1 computes
+# effect cbuffer constants with these; split out dependency-free so the paint.rs port can share them
+# for its shader-mirroring coord-gen's CPU-side matrices, exactly as warpmath shares the WARP intrinsics.
+[package]
+name = "crt"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false

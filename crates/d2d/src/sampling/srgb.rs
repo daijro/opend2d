@@ -1,0 +1,65 @@
+//! WARP sRGB8 intermediate stores and texture loads.
+// Tables: WARP 10.0.26100.1301's 8-bit linear→sRGB and sRGB→linear lookup tables.
+
+/// Store linear RGB to sRGB8, then decode for a subsequent texture sample.
+pub(crate) fn roundtrip(v: f32) -> f32 {
+    // WARP's float→sRGB8 store: clamp, multiply by 4095, round to nearest even, then table lookup.
+    let index = (v.clamp(0.0, 1.0) * 4095.0).round_ties_even() as u16;
+    let code = ENCODE_START.partition_point(|&start| start <= index);
+    f32::from_bits(DECODE[code])
+}
+
+// First 12-bit linear index for each sRGB code 1..255; lossless compression of the 4096-byte LUT.
+const ENCODE_START: [u16; 255] = [
+    1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 18, 19, 21,
+    23, 24, 26, 28, 30, 32, 34, 37, 39, 42, 44, 47, 49, 52, 55, 58,
+    61, 64, 68, 71, 74, 78, 82, 85, 89, 93, 97, 102, 106, 110, 115, 119,
+    124, 129, 134, 139, 144, 149, 154, 160, 165, 171, 177, 183, 189, 195, 201, 207,
+    214, 220, 227, 234, 241, 248, 255, 262, 270, 277, 285, 293, 300, 308, 317, 325,
+    333, 342, 350, 359, 368, 377, 386, 395, 405, 414, 424, 434, 444, 454, 464, 474,
+    485, 495, 506, 517, 528, 539, 550, 562, 573, 585, 597, 609, 621, 633, 645, 658,
+    670, 683, 696, 709, 722, 736, 749, 763, 777, 790, 805, 819, 833, 848, 862, 877,
+    892, 907, 922, 938, 953, 969, 985, 1001, 1017, 1033, 1049, 1066, 1083, 1100, 1117, 1134,
+    1151, 1169, 1186, 1204, 1222, 1240, 1259, 1277, 1296, 1314, 1333, 1352, 1372, 1391, 1410, 1430,
+    1450, 1470, 1490, 1510, 1531, 1552, 1572, 1593, 1615, 1636, 1657, 1679, 1701, 1723, 1745, 1767,
+    1790, 1812, 1835, 1858, 1881, 1904, 1928, 1951, 1975, 1999, 2023, 2048, 2072, 2097, 2122, 2146,
+    2172, 2197, 2222, 2248, 2274, 2300, 2326, 2352, 2379, 2406, 2433, 2460, 2487, 2514, 2542, 2570,
+    2597, 2626, 2654, 2682, 2711, 2740, 2769, 2798, 2827, 2857, 2886, 2916, 2946, 2977, 3007, 3038,
+    3068, 3099, 3130, 3162, 3193, 3225, 3257, 3289, 3321, 3354, 3386, 3419, 3452, 3485, 3518, 3552,
+    3586, 3620, 3654, 3688, 3722, 3757, 3792, 3827, 3862, 3897, 3933, 3969, 4005, 4041, 4077,
+];
+
+const DECODE: [u32; 256] = [
+    0x00000000, 0x399f22b4, 0x3a1f22b4, 0x3a6eb40f, 0x3a9f22b4, 0x3ac6eb61, 0x3aeeb40f, 0x3b0b3e5e,
+    0x3b1f22b4, 0x3b33070b, 0x3b46eb61, 0x3b5b518d, 0x3b70f18d, 0x3b83e1c6, 0x3b8fe616, 0x3b9c87fd,
+    0x3ba9c9b7, 0x3bb7ad6f, 0x3bc63549, 0x3bd56361, 0x3be539c1, 0x3bf5ba70, 0x3c0373b5, 0x3c0c6152,
+    0x3c15a706, 0x3c1f45be, 0x3c293e6b, 0x3c3391f7, 0x3c3e414b, 0x3c494d46, 0x3c54b6ca, 0x3c607eb4,
+    0x3c6ca5df, 0x3c792d22, 0x3c830aa8, 0x3c89afa0, 0x3c9085dd, 0x3c978dc7, 0x3c9ec7c2, 0x3ca63433,
+    0x3cadd37d, 0x3cb5a601, 0x3cbdac22, 0x3cc5e63b, 0x3cce54ad, 0x3cd6f7d5, 0x3cdfd010, 0x3ce8ddb9,
+    0x3cf2212e, 0x3cfb9ac6, 0x3d02a56c, 0x3d0798df, 0x3d0ca7e7, 0x3d11d2b0, 0x3d171965, 0x3d1c7c31,
+    0x3d21fb3c, 0x3d2796b2, 0x3d2d4ebb, 0x3d332380, 0x3d39152e, 0x3d3f23e6, 0x3d454fd4, 0x3d4b991f,
+    0x3d51ffef, 0x3d58846a, 0x3d5f26b7, 0x3d65e6fe, 0x3d6cc564, 0x3d73c20f, 0x3d7add25, 0x3d810b66,
+    0x3d84b793, 0x3d887330, 0x3d8c3e4a, 0x3d9018f6, 0x3d940345, 0x3d97fd4a, 0x3d9c0716, 0x3da020bb,
+    0x3da44a4b, 0x3da883d7, 0x3daccd70, 0x3db12728, 0x3db59110, 0x3dba0b38, 0x3dbe95b3, 0x3dc33092,
+    0x3dc7dbe2, 0x3dcc97b6, 0x3dd1641f, 0x3dd6412c, 0x3ddb2eef, 0x3de02d77, 0x3de53cd4, 0x3dea5d19,
+    0x3def8e56, 0x3df4d093, 0x3dfa23e8, 0x3dff8861, 0x3e027f07, 0x3e054280, 0x3e080ea5, 0x3e0ae379,
+    0x3e0dc107, 0x3e10a755, 0x3e13966c, 0x3e168e53, 0x3e198f11, 0x3e1c98ae, 0x3e1fab32, 0x3e22c6a3,
+    0x3e25eb09, 0x3e29186c, 0x3e2c4ed2, 0x3e2f8e45, 0x3e32d6c8, 0x3e362865, 0x3e398322, 0x3e3ce706,
+    0x3e405419, 0x3e43ca62, 0x3e4749e8, 0x3e4ad2b1, 0x3e4e64c6, 0x3e52002b, 0x3e55a4e9, 0x3e595307,
+    0x3e5d0a8b, 0x3e60cb7c, 0x3e6495e0, 0x3e6869bf, 0x3e6c4720, 0x3e702e08, 0x3e741e7f, 0x3e78188c,
+    0x3e7c1c38, 0x3e8014c2, 0x3e82203c, 0x3e84308d, 0x3e8645ba, 0x3e885fc5, 0x3e8a7eb2, 0x3e8ca283,
+    0x3e8ecb3d, 0x3e90f8e1, 0x3e932b74, 0x3e9562f8, 0x3e979f71, 0x3e99e0e2, 0x3e9c274e, 0x3e9e72b7,
+    0x3ea0c322, 0x3ea31892, 0x3ea57308, 0x3ea7d289, 0x3eaa3718, 0x3eaca0b7, 0x3eaf0f69, 0x3eb18333,
+    0x3eb3fc16, 0x3eb67a15, 0x3eb8fd34, 0x3ebb8576, 0x3ebe12e1, 0x3ec0a571, 0x3ec33d2d, 0x3ec5da17,
+    0x3ec87c33, 0x3ecb2383, 0x3ecdd00b, 0x3ed081cd, 0x3ed338cc, 0x3ed5f50b, 0x3ed8b68d, 0x3edb7d54,
+    0x3ede4965, 0x3ee11ac1, 0x3ee3f16b, 0x3ee6cd67, 0x3ee9aeb6, 0x3eec955d, 0x3eef815d, 0x3ef272ba,
+    0x3ef56976, 0x3ef86594, 0x3efb6717, 0x3efe6e02, 0x3f00bd2b, 0x3f02460c, 0x3f03d1a5, 0x3f055ff9,
+    0x3f06f106, 0x3f0884d1, 0x3f0a1b57, 0x3f0bb49d, 0x3f0d50a2, 0x3f0eef69, 0x3f1090f2, 0x3f123540,
+    0x3f13dc53, 0x3f15862d, 0x3f1732cf, 0x3f18e23b, 0x3f1a9471, 0x3f1c4973, 0x3f1e0143, 0x3f1fbbe1,
+    0x3f217950, 0x3f23398f, 0x3f24fca2, 0x3f26c288, 0x3f288b43, 0x3f2a56d5, 0x3f2c253f, 0x3f2df681,
+    0x3f2fca9e, 0x3f31a197, 0x3f337b6c, 0x3f355820, 0x3f3737b5, 0x3f391a28, 0x3f3aff7e, 0x3f3ce7b7,
+    0x3f3ed2d4, 0x3f40c0d6, 0x3f42b1c0, 0x3f44a592, 0x3f469c4d, 0x3f4895f3, 0x3f4a9284, 0x3f4c9203,
+    0x3f4e9470, 0x3f5099cd, 0x3f52a21a, 0x3f54ad59, 0x3f56bb8c, 0x3f58ccb3, 0x3f5ae0cf, 0x3f5cf7e2,
+    0x3f5f11ee, 0x3f612ef2, 0x3f634ef1, 0x3f6571ec, 0x3f6797e3, 0x3f69c0d8, 0x3f6beccd, 0x3f6e1bc2,
+    0x3f704dba, 0x3f7282b4, 0x3f74bab1, 0x3f76f5b3, 0x3f7933bb, 0x3f7b74cb, 0x3f7db8e3, 0x3f800000,
+];

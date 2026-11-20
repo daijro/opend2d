@@ -1,0 +1,4 @@
+[workspace]
+members = ["crates/warpmath", "crates/crt", "crates/d2d-types", "crates/d2d", "crates/d2d-ffi", "crates/dwrite-ffi", "crates/wic-ffi", "crates/d2d-shader", "crates/d2d-wgpu"]
+exclude = ["harness", "crates/d2d-types/gen", "crates/vendor/jpegxr-pure-rs"]
+resolver = "3"

@@ -1,0 +1,9 @@
+# WARP's shader-math intrinsics (sincos, exp2/log2/pow, rcp/rsqrt/sqrt, frc, …), reproduced bit-for-bit
+# from WARP's JIT. Dependency-free so both opend2d (d2d-shader, the lighting kernels) and the
+# paint.rs port (pdn-core's shader-mirroring coord-gen) share one WARP math library instead of copying.
+[package]
+name = "warpmath"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
